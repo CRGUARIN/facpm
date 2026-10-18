@@ -1,5 +1,5 @@
-//! Limpieza: el modal de cada tarea y el escaneo en segundo plano, que conserva la selección por
-//! tipo de tarea.
+//! Cleanup: each task's modal and the background scan, which keeps the selection by
+//! task kind.
 
 use super::{App, Modal, Tab, clean_row};
 use crate::backend::clean::CleanTask;
@@ -21,17 +21,17 @@ impl App {
                     .task
                     .note
                     .clone()
-                    .unwrap_or_else(|| "Nada que limpiar".to_string());
+                    .unwrap_or_else(|| "Nothing to clean".to_string());
                 self.set_status(msg, false);
             }
         }
     }
 
-    /// Arranca el escaneo de Limpieza. Los huérfanos se calculan aquí (alpm es rápido); el
-    /// escaneo, que puede tardar, va en un hilo con la generación actual.
+    /// Starts the Cleanup scan. The orphans are computed here (alpm is fast); the scan itself,
+    /// which can take a while, runs in a thread with the current generation.
     pub(super) fn spawn_clean_scan(&mut self) {
         self.clean_opened = true;
-        // Se recuerda la tarea seleccionada, esté o no esta pestaña activa.
+        // Remember the selected task, whether or not this tab is active.
         let current = self.state.lists[Tab::Clean.idx()]
             .selected()
             .and_then(|i| self.state.clean.get(i))
@@ -103,7 +103,7 @@ mod tests {
         );
         assert_eq!(
             app.state.clean[2].command, None,
-            "sin disponibilidad no hay comando"
+            "unavailable tasks have no command"
         );
     }
 
@@ -114,7 +114,7 @@ mod tests {
         let stale = app.clean_gen + 7;
         app.on_clean_scan(stale, sample_clean_tasks());
         assert!(app.state.clean.is_empty());
-        assert!(app.state.clean_pending, "sigue calculando");
+        assert!(app.state.clean_pending, "still scanning");
     }
 
     #[test]
@@ -139,7 +139,7 @@ mod tests {
                     "sudo paccache -rk1"
                 )
             }
-            None => panic!("confirmar debe devolver la acción"),
+            None => panic!("confirming must return the action"),
         }
         assert!(app.state.modal.is_none());
     }
@@ -154,7 +154,11 @@ mod tests {
         press(&mut app, KeyCode::Char('j'));
         press(&mut app, KeyCode::Char('c'));
         assert!(app.state.modal.is_none());
-        assert!(status_text(&app).contains("requiere pacman-contrib"));
+        let note = sample_clean_tasks()[2]
+            .note
+            .clone()
+            .expect("the sample task has a note");
+        assert!(status_text(&app).contains(&note));
     }
 
     #[test]
@@ -173,7 +177,7 @@ mod tests {
         let mut reversed = sample_clean_tasks();
         reversed.reverse();
         app.on_clean_scan(generation, reversed);
-        let selected = app.state.selected_clean().expect("hay una selección");
+        let selected = app.state.selected_clean().expect("there is a selection");
         assert_eq!(selected.task.kind, CleanKind::PkgCacheKeepLatest);
     }
 }

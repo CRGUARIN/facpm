@@ -1,61 +1,92 @@
 <div align="center">
 
-# facpm
+<img src="assets/logo.png" alt="facpm" width="230">
 
-**Tus paquetes de Arch y del AUR, en una terminal que da gusto usar.**
+### Like lazygit, but for your Arch packages.
 
-<img src="assets/preview.gif" alt="facpm buscando neovim, mostrando su PKGBUILD y cambiando de tema" width="900">
+Search the repos and the AUR as you type, read the PKGBUILD before you install,<br>
+upgrade with your eyes open and reclaim gigabytes of cache, all from one keyboard-driven TUI.
+
+[![Arch Linux](https://img.shields.io/badge/Arch_Linux-1793D1?style=for-the-badge&logo=archlinux&logoColor=white)](https://archlinux.org)
+[![Rust](https://img.shields.io/badge/Rust-B7410E?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![License: MIT](https://img.shields.io/github/license/CRGUARIN/facpm?style=for-the-badge&color=957FB8)](LICENSE)
+
+[Why](#why-facpm) · [Install](#install) · [Keys](#keys) · [Themes](#themes) · [Configuration](#configuration)
+
+<img src="assets/preview.gif" alt="facpm searching for neovim, reading its PKGBUILD and switching themes" width="900">
 
 </div>
 
-facpm es un gestor de paquetes para Arch Linux con interfaz de terminal al estilo lazygit.
-Busca en los repositorios y en el AUR sin esperas, te deja leer el PKGBUILD antes de instalar
-y te avisa cuando una actualización merece una segunda mirada. Para instalar usa tu AUR helper
-de siempre.
+## Why facpm
 
-## Qué hace
+- **No more walls of `yay -Ss` output.** Results from the repos and the AUR show up as you type,
+  ranked, from a local copy of the AUR index.
+- **Know what you're about to run.** Every package has its PKGBUILD one key away,
+  syntax-highlighted, for the AUR and the official repos alike.
+- **Upgrade with your eyes open.** facpm flags AUR packages that changed maintainer since your
+  last upgrade, were orphaned, flagged out of date or are new with few votes, and it shows the
+  Arch news that needs manual intervention before you press `U`.
+- **Get your disk back.** Orphans, old package versions, the AUR build cache: see how much each
+  one frees, then clean it with one key.
+- **Fits your setup.** It uses paru, yay or pikaur if you have one, plain pacman if you don't,
+  and ships with 12 color themes.
 
-- Busca al instante en los repos y en el AUR, con un índice local del AUR que se renueva cada 24 horas.
-- Muestra el PKGBUILD con resaltado, tanto del AUR como de los repos oficiales.
-- Te avisa antes de actualizar si un paquete del AUR cambió de mantenedor, quedó huérfano o está
-  marcado como desactualizado, y si hay noticias de Arch que piden intervención manual.
-- Limpia huérfanos, la caché de pacman y la de compilación del AUR, y te dice cuánto vas a recuperar.
-- Trae 12 temas: Kanagawa, Catppuccin, Tokyo Night, Gruvbox, Dracula, Nord y más.
-- Instala y desinstala con paru, yay o pikaur si los tienes, o con pacman si no.
+## Install
 
-## Instalación
-
-Desde el AUR:
+From the AUR:
 
 ```sh
-yay -S facpm
+paru -S facpm   # or: yay -S facpm
 ```
 
-Desde el código, con Rust instalado:
+From source (Rust 1.85 or newer):
 
 ```sh
 git clone https://github.com/CRGUARIN/facpm
 cd facpm
 cargo build --release
-./target/release/facpm
+sudo install -Dm755 target/release/facpm /usr/local/bin/facpm
 ```
 
-Se recomienda `pacman-contrib`, que aporta `checkupdates` y `paccache`.
+`pacman-contrib` is recommended: facpm uses its `checkupdates` and `paccache`.
 
-## Teclas
+## Keys
 
-| Tecla | Acción |
+| Key | Action |
 |---|---|
-| `1` `2` `3` `4` | Instalados, Buscar, Actualizaciones, Limpieza |
-| `/` | Filtrar o buscar |
-| `espacio` | Marcar varios paquetes |
-| `i` / `d` | Instalar / desinstalar |
-| `u` | Actualizar el sistema |
-| `p` | Ver el PKGBUILD |
-| `t` | Cambiar el tema |
-| `n` | Noticias de Arch |
-| `?` | Ver todas las teclas |
+| `1` `2` `3` `4` | Installed · Search · Updates · Cleanup |
+| `j` `k` | Move |
+| `/` | Filter or search |
+| `space` | Mark several packages |
+| `i` | Install |
+| `u` | Uninstall |
+| `U` | Upgrade the whole system |
+| `p` | Toggle Details / PKGBUILD |
+| `J` `K` | Scroll the right panel |
+| `c` | Clean the selected task |
+| `n` | Arch Linux news |
+| `t` | Pick a theme |
+| `?` | Every other key |
+| `q` | Quit |
 
-## Licencia
+## Themes
 
-[MIT](LICENSE)
+Press `t` to preview them live. Your pick is saved for the next time.
+
+<img src="assets/themes.png" alt="The twelve facpm themes">
+
+## Configuration
+
+```toml
+# ~/.config/facpm/config.toml
+theme = "kanagawa"
+```
+
+Themes: `terminal`, `kanagawa`, `monokai`, `dracula`, `gruvbox`, `catppuccin`, `tokyonight`,
+`nord`, `onedark`, `rosepine`, `everforest`, `solarized`.
+
+To force a specific helper, set `FACPM_HELPER` to `paru`, `yay`, `pikaur` or `pacman`.
+
+## License
+
+[MIT](LICENSE) © Cristian Alejandro Guarin Marin

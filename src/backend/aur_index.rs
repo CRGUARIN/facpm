@@ -14,10 +14,10 @@ const INDEX_URL: &str = "https://aur.archlinux.org/packages-meta-v1.json.gz";
 const FILE_NAME: &str = "packages-meta-v1.json.gz";
 const TIMEOUT: Duration = Duration::from_secs(60);
 const USER_AGENT: &str = concat!("facpm/", env!("CARGO_PKG_VERSION"));
-/// Cabecera de un gzip: evita guardar como caché una respuesta HTML.
+/// Gzip magic bytes: keeps an HTML reply from being cached as the index.
 const GZIP_MAGIC: [u8; 2] = [0x1f, 0x8b];
 
-/// Forma compacta del índice: solo los campos que usan la búsqueda y las actualizaciones.
+/// Compact form of the index: only the fields that search and updates use.
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct Entry {
@@ -53,7 +53,7 @@ impl Entry {
         }
     }
 
-    /// Las listas de dependencias quedan vacías: para ellas está `aur::info`.
+    /// Dependency lists are left empty: `aur::info` has them.
     fn to_pkg(&self) -> AurPkg {
         AurPkg {
             name: self.name.to_string(),
@@ -91,7 +91,7 @@ impl AurFields for Entry {
 }
 
 pub struct AurIndex {
-    /// Ordenados por nombre, para buscar por bisección en `get`.
+    /// Sorted by name, so `get` can binary-search.
     pkgs: Vec<Entry>,
 }
 
@@ -104,7 +104,7 @@ impl AurIndex {
         load_from(&Self::cache_path())
     }
 
-    /// Descarga el índice si la caché falta o tiene más de `max_age`. Ok(true) si bajó uno nuevo.
+    /// Downloads the index if the cache is missing or older than `max_age`. Ok(true) if a new one came down.
     pub fn refresh_if_stale(max_age: Duration) -> anyhow::Result<bool> {
         refresh_at(&Self::cache_path(), max_age)
     }
@@ -117,7 +117,7 @@ impl AurIndex {
         self.pkgs.is_empty()
     }
 
-    /// Recorre todo el índice: conviene usarlo solo con los foráneos que no aparecen por nombre.
+    /// Scans the whole index: only worth it for foreign packages not found by name.
     pub fn has_base(&self, base: &str) -> bool {
         self.pkgs.iter().any(|p| &*p.package_base == base)
     }
@@ -127,7 +127,7 @@ impl AurIndex {
         Some(self.pkgs[i].to_pkg())
     }
 
-    /// Como `aur::search`, pero sin mínimo de dos caracteres.
+    /// Like `aur::search`, but without the two-character minimum.
     pub fn search(&self, query: &str) -> Vec<AurPkg> {
         let lowered = query.to_lowercase();
         let terms: Vec<&str> = lowered.split_whitespace().collect();
@@ -155,7 +155,7 @@ impl AurIndex {
     }
 }
 
-/// Carpeta de caché: `XDG_CACHE_HOME` si está definida y no vacía; si no, `HOME/.cache`.
+/// Cache folder: `XDG_CACHE_HOME` if set and not empty; otherwise `HOME/.cache`.
 fn cache_path_from(xdg_cache_home: Option<OsString>, home: Option<OsString>) -> PathBuf {
     let base = match xdg_cache_home.filter(|dir| !dir.is_empty()) {
         Some(dir) => PathBuf::from(dir),
@@ -168,21 +168,21 @@ fn load_from(path: &Path) -> anyhow::Result<Option<AurIndex>> {
     let file = match File::open(path) {
         Ok(file) => file,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(e).with_context(|| format!("no se pudo abrir {}", path.display())),
+        Err(e) => return Err(e).with_context(|| format!("couldn't open {}", path.display())),
     };
     let pkgs: Vec<Entry> = serde_json::from_reader(BufReader::new(GzDecoder::new(file)))
-        .with_context(|| format!("índice del AUR no válido: {}", path.display()))?;
+        .with_context(|| format!("invalid AUR index: {}", path.display()))?;
     Ok(Some(AurIndex::new(pkgs)))
 }
 
 fn refresh_at(path: &Path, max_age: Duration) -> anyhow::Result<bool> {
     let modified = fs::metadata(path).and_then(|m| m.modified()).ok();
-    // Una fecha futura (reloj movido hacia atrás) cuenta como vieja.
+    // A date in the future (the clock moved back) counts as old.
     if modified.is_some_and(|time| time.elapsed().is_ok_and(|age| age < max_age)) {
         return Ok(false);
     }
     if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir).with_context(|| format!("no se pudo crear {}", dir.display()))?;
+        fs::create_dir_all(dir).with_context(|| format!("couldn't create {}", dir.display()))?;
     }
 
     let mut request = ureq::get(INDEX_URL)
@@ -191,10 +191,8 @@ fn refresh_at(path: &Path, max_age: Duration) -> anyhow::Result<bool> {
     if let Some(time) = modified {
         request = request.set("If-Modified-Since", &http_date(time));
     }
-    // ureq 2 solo trata >= 400 como error: un 304 llega como `Ok`.
-    let response = request
-        .call()
-        .context("no se pudo descargar el índice del AUR")?;
+    // ureq 2 only treats >= 400 as an error: a 304 comes back as `Ok`.
+    let response = request.call().context("couldn't download the AUR index")?;
     match response.status() {
         304 => {
             File::options()
@@ -207,11 +205,11 @@ fn refresh_at(path: &Path, max_age: Duration) -> anyhow::Result<bool> {
             store(&mut response.into_reader(), path)?;
             Ok(true)
         }
-        status => bail!("respuesta inesperada del AUR: HTTP {status}"),
+        status => bail!("unexpected reply from the AUR: HTTP {status}"),
     }
 }
 
-/// Escribe en un temporal con el pid y lo renombra sobre `path`, así la caché no queda a medias.
+/// Writes to a temporary file named after the pid and renames it over `path`, so the cache is never half-written.
 fn store(body: &mut impl Read, path: &Path) -> anyhow::Result<()> {
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(format!(".{}.tmp", std::process::id()));
@@ -227,16 +225,16 @@ fn store(body: &mut impl Read, path: &Path) -> anyhow::Result<()> {
 fn write_and_rename(body: &mut impl Read, tmp: &Path, path: &Path) -> anyhow::Result<()> {
     let mut magic = [0u8; 2];
     body.read_exact(&mut magic)
-        .context("el AUR devolvió un cuerpo demasiado corto")?;
-    ensure!(magic == GZIP_MAGIC, "el AUR no devolvió un archivo gzip");
+        .context("the AUR returned a body that is too short")?;
+    ensure!(magic == GZIP_MAGIC, "the AUR didn't return a gzip file");
 
     let mut file =
-        File::create(tmp).with_context(|| format!("no se pudo crear {}", tmp.display()))?;
+        File::create(tmp).with_context(|| format!("couldn't create {}", tmp.display()))?;
     file.write_all(&magic)?;
-    io::copy(body, &mut file).context("error descargando el índice del AUR")?;
+    io::copy(body, &mut file).context("failed to download the AUR index")?;
     file.sync_all()?;
     drop(file);
-    fs::rename(tmp, path).with_context(|| format!("no se pudo reemplazar {}", path.display()))
+    fs::rename(tmp, path).with_context(|| format!("couldn't replace {}", path.display()))
 }
 
 fn http_date(time: SystemTime) -> String {
@@ -253,7 +251,7 @@ mod tests {
 
     const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 
-    /// Carpeta temporal que se borra al salir del test, pase o falle.
+    /// Temporary folder removed when the test exits, pass or fail.
     struct TempDir(PathBuf);
 
     impl TempDir {
@@ -298,7 +296,7 @@ mod tests {
             "NumVotes": 10,
             "Popularity": popularity,
             "OutOfDate": null,
-            "Maintainer": "alguien",
+            "Maintainer": "someone",
             "FirstSubmitted": 1600000000,
             "LastModified": 1700000000,
             "URLPath": format!("/cgit/aur.git/snapshot/{name}.tar.gz"),
@@ -310,10 +308,10 @@ mod tests {
 
     fn sample_json() -> String {
         serde_json::json!([
-            entry("git", "Sistema de control de versiones distribuido", 0.5),
-            entry("git-extras", "Utilidades para Git", 3.0),
-            entry("lazygit", "Interfaz de terminal para GIT", 2.0),
-            entry("firefox", "Navegador web rápido y privado", 9.0),
+            entry("git", "Distributed version control system", 0.5),
+            entry("git-extras", "Utilities for Git", 3.0),
+            entry("lazygit", "Terminal UI for GIT", 2.0),
+            entry("firefox", "Fast and private web browser, née Phoenix", 9.0),
         ])
         .to_string()
     }
@@ -360,16 +358,16 @@ mod tests {
         let path = dir.join(FILE_NAME);
         write_gz(&path, &sample_json());
 
-        let index = load_from(&path).unwrap().expect("el archivo existe");
+        let index = load_from(&path).unwrap().expect("the file exists");
         assert_eq!(index.len(), 4);
         assert_eq!(index.get("git").map(|p| p.popularity), Some(0.5));
-        assert!(index.get("no-existe").is_none());
+        assert!(index.get("does-not-exist").is_none());
 
         assert_eq!(names(index.search("git")), ["git", "git-extras", "lazygit"]);
         assert_eq!(names(index.search("GIT")), ["git", "git-extras", "lazygit"]);
         assert_eq!(names(index.search("terminal git")), ["lazygit"]);
         assert!(index.search("firefox git").is_empty());
-        assert_eq!(names(index.search("RÁPIDO")), ["firefox"]);
+        assert_eq!(names(index.search("NÉE")), ["firefox"]);
         assert!(names(index.search("g")).contains(&"git".to_string()));
         assert!(index.search("   ").is_empty());
     }
@@ -377,15 +375,15 @@ mod tests {
     #[test]
     fn search_caps_results_at_250() {
         let pkgs: Vec<serde_json::Value> = (0..300)
-            .map(|i| entry(&format!("paquete-{i:03}"), "demo", f64::from(i)))
+            .map(|i| entry(&format!("package-{i:03}"), "demo", f64::from(i)))
             .collect();
         let pkgs: Vec<AurPkg> = serde_json::from_value(serde_json::Value::Array(pkgs)).unwrap();
         let index = AurIndex::from_pkgs(pkgs);
 
-        let hits = index.search("paquete");
+        let hits = index.search("package");
         assert_eq!(hits.len(), 250);
-        assert_eq!(hits[0].name, "paquete-299");
-        assert_eq!(hits[249].name, "paquete-050");
+        assert_eq!(hits[0].name, "package-299");
+        assert_eq!(hits[249].name, "package-050");
     }
 
     #[test]
@@ -411,12 +409,12 @@ mod tests {
         let dir = TempDir::new("online");
         let path = dir.join(FILE_NAME);
 
-        assert!(refresh_at(&path, DAY).expect("descarga inicial"));
+        assert!(refresh_at(&path, DAY).expect("initial download"));
         assert!(!refresh_at(&path, DAY).expect("segunda llamada"));
-        refresh_at(&path, Duration::ZERO).expect("revalidación con If-Modified-Since");
+        refresh_at(&path, Duration::ZERO).expect("revalidation with If-Modified-Since");
 
-        let index = load_from(&path).unwrap().expect("caché presente");
-        assert!(index.len() > 100_000, "paquetes: {}", index.len());
+        let index = load_from(&path).unwrap().expect("cache present");
+        assert!(index.len() > 100_000, "packages: {}", index.len());
         assert!(!index.search("firefox").is_empty());
     }
 }

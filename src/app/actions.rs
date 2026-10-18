@@ -1,4 +1,4 @@
-//! Acciones sobre paquetes: marcar, instalar, desinstalar, armar el comando y recargar la base.
+//! Package actions: mark, install, uninstall, build the command and reload the database.
 
 use std::process::Command;
 
@@ -7,7 +7,7 @@ use crate::backend::helper::command_line;
 use crate::pkg::{Package, Source};
 
 const PARTIAL_UPDATE_MSG: &str =
-    "Las actualizaciones parciales no están soportadas: usa u para actualizar todo el sistema";
+    "Partial upgrades aren't supported: press U to upgrade the whole system";
 
 impl App {
     pub(super) fn toggle_mark(&mut self) {
@@ -28,8 +28,8 @@ impl App {
         self.state.move_sel(1);
     }
 
-    /// En Actualizaciones, espacio, `i` y `d` no hacen nada: solo avisan. Devuelve true si la
-    /// tecla se bloqueó.
+    /// In Updates, space, `i` and `u` do nothing but warn. Returns true if the key
+    /// was blocked.
     fn partial_update_blocked(&mut self) -> bool {
         if self.state.tab != Tab::Updates {
             return false;
@@ -38,7 +38,7 @@ impl App {
         true
     }
 
-    /// Paquetes sobre los que actúan `i` y `d`: los marcados visibles o, si no hay, el actual.
+    /// Packages that `i` and `u` act on: the visible marked ones or, if none, the current one.
     fn targets(&self) -> Vec<Package> {
         let marked = &self.state.marked[self.state.tab.idx()];
         let picked: Vec<Package> = self
@@ -66,11 +66,14 @@ impl App {
         }
         let targets = self.targets();
         if targets.is_empty() {
-            self.set_status("No hay ningún paquete seleccionado", false);
+            self.set_status("No package selected", false);
             return;
         }
         if !self.helper.supports_aur() && targets.iter().any(|p| p.source == Source::Aur) {
-            let msg = format!("El helper actual ({}) no soporta AUR", self.helper.name());
+            let msg = format!(
+                "The current helper ({}) doesn't support the AUR",
+                self.helper.name()
+            );
             self.set_status(msg, false);
             return;
         }
@@ -87,7 +90,7 @@ impl App {
         }
         let targets = self.targets();
         if targets.is_empty() {
-            self.set_status("No hay ningún paquete seleccionado", false);
+            self.set_status("No package selected", false);
             return;
         }
         let pkgs: Vec<String> = targets
@@ -96,7 +99,7 @@ impl App {
             .map(|p| p.name)
             .collect();
         if pkgs.is_empty() {
-            self.set_status("Ningún paquete seleccionado está instalado", false);
+            self.set_status("None of the selected packages is installed", false);
             return;
         }
         self.open_confirm(OpKind::Remove, pkgs);
@@ -119,10 +122,10 @@ impl App {
         }
     }
 
-    /// Recarga la base de pacman. `r` también rehace la búsqueda del AUR si hay una consulta.
+    /// Reloads the pacman database. `r` also redoes the AUR search if there's a query.
     pub(super) fn reload(&mut self) {
         if let Err(e) = self.repo.reload() {
-            self.set_status(format!("No se pudo recargar: {e:#}"), false);
+            self.set_status(format!("Couldn't reload: {e:#}"), false);
             return;
         }
         self.refresh_db();
@@ -130,7 +133,7 @@ impl App {
             self.aur_last_query = None;
             self.search_aur_now();
         }
-        self.set_status("Base de datos recargada", true);
+        self.set_status("Database reloaded", true);
     }
 }
 
@@ -146,9 +149,9 @@ mod tests {
     fn partial_update_keys_only_warn_in_updates_tab() {
         let mut app = empty_app();
         press(&mut app, KeyCode::Char('3'));
-        for c in [' ', 'i', 'd'] {
+        for c in [' ', 'i', 'u'] {
             press(&mut app, KeyCode::Char(c));
-            assert!(status_text(&app).contains("parciales"), "tecla {c:?}");
+            assert!(status_text(&app).contains("Partial upgrades"), "key {c:?}");
         }
         assert!(app.state.marked[Tab::Updates.idx()].is_empty());
         assert!(app.state.modal.is_none());
@@ -166,11 +169,11 @@ mod tests {
             installed: None,
         }];
         app.state.clamp_lists();
-        press(&mut app, KeyCode::Char('d'));
+        press(&mut app, KeyCode::Char('u'));
         assert!(app.state.modal.is_none());
         assert_eq!(
             status_text(&app),
-            "Ningún paquete seleccionado está instalado"
+            "None of the selected packages is installed"
         );
     }
 
@@ -190,7 +193,7 @@ mod tests {
         assert!(app.state.modal.is_none());
         assert_eq!(
             status_text(&app),
-            "El helper actual (pacman) no soporta AUR"
+            "The current helper (pacman) doesn't support the AUR"
         );
         assert_eq!(level(&app), Some(Level::Error));
     }

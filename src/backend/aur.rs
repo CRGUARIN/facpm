@@ -61,42 +61,36 @@ impl AurPkg {
 
     pub fn details(&self) -> Details {
         let mut rows = vec![
-            row("Nombre", self.name.clone()),
-            row("Versión", self.version.clone()),
-            row("Descripción", or_dash(self.description.as_deref())),
-            row("Repositorio", "aur".to_string()),
+            row("Name", self.name.clone()),
+            row("Version", self.version.clone()),
+            row("Description", or_dash(self.description.as_deref())),
+            row("Repository", "aur".to_string()),
         ];
         if self.package_base != self.name {
-            rows.push(row("Paquete base", self.package_base.clone()));
+            rows.push(row("Package base", self.package_base.clone()));
         }
         rows.extend([
             row("URL", or_dash(self.url.as_deref())),
-            row("Licencias", join_list(&self.license, "  ")),
-            row("Palabras clave", join_list(&self.keywords, "  ")),
-            row("Depende de", join_list(&self.depends, "  ")),
+            row("Licenses", join_list(&self.license, "  ")),
+            row("Keywords", join_list(&self.keywords, "  ")),
+            row("Depends on", join_list(&self.depends, "  ")),
+            row("Make dependencies", join_list(&self.make_depends, "  ")),
+            row("Optional dependencies", join_list(&self.opt_depends, "\n")),
             row(
-                "Dependencias de compilación",
-                join_list(&self.make_depends, "  "),
+                "Maintainer",
+                self.maintainer.as_deref().unwrap_or("orphaned").to_string(),
             ),
+            row("Votes", self.num_votes.to_string()),
+            row("Popularity", format!("{:.2}", self.popularity)),
             row(
-                "Dependencias opcionales",
-                join_list(&self.opt_depends, "\n"),
-            ),
-            row(
-                "Mantenedor",
-                self.maintainer.as_deref().unwrap_or("huérfano").to_string(),
-            ),
-            row("Votos", self.num_votes.to_string()),
-            row("Popularidad", format!("{:.2}", self.popularity)),
-            row(
-                "Desactualizado",
+                "Out of date",
                 self.out_of_date
                     .map_or_else(|| "No".to_string(), format_date),
             ),
-            row("Enviado", format_date(self.first_submitted)),
-            row("Última modificación", format_date(self.last_modified)),
+            row("Submitted", format_date(self.first_submitted)),
+            row("Last modified", format_date(self.last_modified)),
             row(
-                "URL del AUR",
+                "AUR URL",
                 format!("https://aur.archlinux.org/packages/{}", self.name),
             ),
         ]);
@@ -104,11 +98,11 @@ impl AurPkg {
     }
 }
 
-/// Pide al RPC solo el término más largo; el resto se filtra localmente.
+/// Asks the RPC only for the longest term; the rest is filtered locally.
 pub fn search(query: &str) -> anyhow::Result<Vec<AurPkg>> {
     let lowered = query.to_lowercase();
     let terms: Vec<&str> = lowered.split_whitespace().collect();
-    // `min_by_key` devuelve el primero en caso de empate: a igual largo, gana el primer término.
+    // `min_by_key` returns the first on a tie: for equal lengths, the first term wins.
     let longest = terms
         .iter()
         .copied()
@@ -131,7 +125,7 @@ pub fn search(query: &str) -> anyhow::Result<Vec<AurPkg>> {
     Ok(pkgs)
 }
 
-/// Lo que usan la búsqueda y el orden; lo cumplen `AurPkg` y el índice local.
+/// What search and sorting use; both `AurPkg` and the local index implement it.
 pub(crate) trait AurFields {
     fn name_str(&self) -> &str;
     fn description_str(&self) -> &str;
@@ -173,7 +167,7 @@ pub(crate) fn matches<P: AurFields, S: AsRef<str>>(pkg: &P, terms: &[S]) -> bool
     })
 }
 
-/// Primero el nombre igual a `query_lc`, luego popularidad y nombre; recorta a `MAX_RESULTS`.
+/// An exact name match to `query_lc` first, then popularity and name; truncated to `MAX_RESULTS`.
 pub(crate) fn sort_results<T: AurFields>(pkgs: &mut Vec<T>, query_lc: &str) {
     let cmp = |a: &T, b: &T| {
         (!eq_lc(a.name_str(), query_lc))
@@ -182,7 +176,7 @@ pub(crate) fn sort_results<T: AurFields>(pkgs: &mut Vec<T>, query_lc: &str) {
             .then_with(|| a.name_str().cmp(b.name_str()))
     };
     if pkgs.len() > MAX_RESULTS {
-        // Con selección O(n) se separan los mejores y solo esos se ordenan.
+        // Selecting in O(n) splits off the best ones, and only those get sorted.
         pkgs.select_nth_unstable_by(MAX_RESULTS - 1, cmp);
         pkgs.truncate(MAX_RESULTS);
     }
@@ -195,7 +189,7 @@ fn eq_lc(text: &str, query_lc: &str) -> bool {
         .eq(query_lc.chars())
 }
 
-/// Como `str::contains` sin distinguir mayúsculas y sin copiar el texto.
+/// Like `str::contains`, but case-insensitive and without copying the text.
 fn contains_lc(text: &str, needle: &str) -> bool {
     if needle.is_empty() {
         return true;
@@ -232,7 +226,7 @@ fn fetch(request: ureq::Request) -> anyhow::Result<Vec<AurPkg>> {
         .set("User-Agent", USER_AGENT)
         .call()?
         .into_json()
-        .context("respuesta del AUR no válida")?;
+        .context("invalid reply from the AUR")?;
     into_results(response)
 }
 
@@ -240,7 +234,7 @@ fn into_results(response: RpcResponse) -> anyhow::Result<Vec<AurPkg>> {
     if response.kind == "error" {
         let message = response
             .error
-            .unwrap_or_else(|| "error desconocido del AUR".to_string());
+            .unwrap_or_else(|| "unknown AUR error".to_string());
         return Err(anyhow!(message));
     }
     Ok(response.results)
@@ -276,13 +270,13 @@ mod tests {
 
     const SEARCH_JSON: &str = r#"{"resultcount":1,"results":[{"Description":"Yet another yogurt. Pacman wrapper and AUR helper written in go.","FirstSubmitted":1480777574,"ID":2131229,"LastModified":1781904582,"Maintainer":null,"Name":"yay","NumVotes":370,"OutOfDate":null,"PackageBase":"yay","PackageBaseID":117489,"Popularity":4.044327,"URL":null,"URLPath":"/cgit/aur.git/snapshot/yay.tar.gz","Version":"13.0.1-1"}],"type":"search","version":5}"#;
 
-    const INFO_JSON: &str = r#"{"resultcount":1,"results":[{"Description":"Demo package","FirstSubmitted":1480777574,"ID":1,"LastModified":1781904582,"Maintainer":"alguien","Name":"demo","NumVotes":3,"OutOfDate":null,"PackageBase":"demo-base","PackageBaseID":1,"Popularity":0.5,"URL":"https://example.org","URLPath":"/cgit/aur.git/snapshot/demo.tar.gz","Version":"1.0-1","Depends":["glibc"],"MakeDepends":["cargo"],"OptDepends":["alfa: primero","beta: segundo"],"License":["MIT"],"Keywords":["cli","tui"]}],"type":"multiinfo","version":5}"#;
+    const INFO_JSON: &str = r#"{"resultcount":1,"results":[{"Description":"Demo package","FirstSubmitted":1480777574,"ID":1,"LastModified":1781904582,"Maintainer":"someone","Name":"demo","NumVotes":3,"OutOfDate":null,"PackageBase":"demo-base","PackageBaseID":1,"Popularity":0.5,"URL":"https://example.org","URLPath":"/cgit/aur.git/snapshot/demo.tar.gz","Version":"1.0-1","Depends":["glibc"],"MakeDepends":["cargo"],"OptDepends":["alpha: first","beta: second"],"License":["MIT"],"Keywords":["cli","tui"]}],"type":"multiinfo","version":5}"#;
 
     const ERROR_JSON: &str =
         r#"{"type":"error","error":"Too many package results.","resultcount":0,"results":[]}"#;
 
     fn parse(json: &str) -> RpcResponse {
-        serde_json::from_str(json).expect("JSON de prueba válido")
+        serde_json::from_str(json).expect("valid test JSON")
     }
 
     fn first_pkg(json: &str) -> AurPkg {
@@ -307,7 +301,7 @@ mod tests {
             "LastModified": 0,
             "PackageBase": name,
         }))
-        .expect("paquete de prueba válido")
+        .expect("valid test package")
     }
 
     #[test]
@@ -335,41 +329,41 @@ mod tests {
     #[test]
     fn details_have_defaults_for_missing_fields() {
         let details = first_pkg(SEARCH_JSON).details();
-        assert_eq!(value_of(&details, "Nombre"), Some("yay"));
-        assert_eq!(value_of(&details, "Votos"), Some("370"));
-        assert_eq!(value_of(&details, "Popularidad"), Some("4.04"));
+        assert_eq!(value_of(&details, "Name"), Some("yay"));
+        assert_eq!(value_of(&details, "Votes"), Some("370"));
+        assert_eq!(value_of(&details, "Popularity"), Some("4.04"));
         assert_eq!(
-            value_of(&details, "URL del AUR"),
+            value_of(&details, "AUR URL"),
             Some("https://aur.archlinux.org/packages/yay")
         );
-        assert_eq!(value_of(&details, "Mantenedor"), Some("huérfano"));
-        assert_eq!(value_of(&details, "Desactualizado"), Some("No"));
+        assert_eq!(value_of(&details, "Maintainer"), Some("orphaned"));
+        assert_eq!(value_of(&details, "Out of date"), Some("No"));
         assert_eq!(value_of(&details, "URL"), Some("—"));
-        assert_eq!(value_of(&details, "Depende de"), Some("—"));
-        assert_eq!(value_of(&details, "Repositorio"), Some("aur"));
+        assert_eq!(value_of(&details, "Depends on"), Some("—"));
+        assert_eq!(value_of(&details, "Repository"), Some("aur"));
     }
 
     #[test]
     fn lists_are_joined_with_their_separator() {
         let details = first_pkg(INFO_JSON).details();
         assert_eq!(
-            value_of(&details, "Dependencias opcionales"),
-            Some("alfa: primero\nbeta: segundo")
+            value_of(&details, "Optional dependencies"),
+            Some("alpha: first\nbeta: second")
         );
-        assert_eq!(value_of(&details, "Depende de"), Some("glibc"));
-        assert_eq!(value_of(&details, "Palabras clave"), Some("cli  tui"));
+        assert_eq!(value_of(&details, "Depends on"), Some("glibc"));
+        assert_eq!(value_of(&details, "Keywords"), Some("cli  tui"));
     }
 
     #[test]
     fn package_base_row_only_when_it_differs_from_name() {
         let same = first_pkg(SEARCH_JSON).details();
-        assert_eq!(value_of(&same, "Paquete base"), None);
+        assert_eq!(value_of(&same, "Package base"), None);
 
         let diff = first_pkg(INFO_JSON).details();
         let keys: Vec<&str> = diff.iter().map(|(k, _)| k.as_str()).collect();
-        assert_eq!(keys[3], "Repositorio");
-        assert_eq!(keys[4], "Paquete base");
-        assert_eq!(value_of(&diff, "Paquete base"), Some("demo-base"));
+        assert_eq!(keys[3], "Repository");
+        assert_eq!(keys[4], "Package base");
+        assert_eq!(value_of(&diff, "Package base"), Some("demo-base"));
     }
 
     #[test]
@@ -401,11 +395,11 @@ mod tests {
     #[test]
     fn exact_name_first_then_popularity_then_name() {
         let mut pkgs = vec![
-            pkg("git-extras", "Utilidades para Git", 3.0),
-            pkg("lazygit", "Interfaz de terminal para GIT", 2.0),
-            pkg("git-lfs", "Almacenamiento de archivos grandes", 2.0),
-            pkg("git", "Control de versiones", 0.5),
-            pkg("firefox", "Navegador", 9.0),
+            pkg("git-extras", "Utilities for Git", 3.0),
+            pkg("lazygit", "Terminal UI for GIT", 2.0),
+            pkg("git-lfs", "Storage for large files", 2.0),
+            pkg("git", "Version control", 0.5),
+            pkg("firefox", "Browser", 9.0),
         ];
         pkgs.retain(|p| matches(p, &["git"]));
         sort_results(&mut pkgs, "git");
@@ -415,23 +409,23 @@ mod tests {
 
     #[test]
     fn matches_requires_every_term_case_insensitive() {
-        let p = pkg("lazygit", "Interfaz de terminal para GIT", 2.0);
+        let p = pkg("lazygit", "Terminal UI for GIT", 2.0);
         assert!(matches(&p, &["git", "terminal"]));
-        assert!(matches(&p, &["lazy", "interfaz"]));
+        assert!(matches(&p, &["lazy", "ui"]));
         assert!(!matches(&p, &["git", "firefox"]));
     }
 
     #[test]
     fn matches_non_ascii_text() {
-        let p = pkg("ñandu-tools", "Herramientas del NÚCLEO", 1.0);
-        assert!(matches(&p, &["ñandu", "núcleo"]));
+        let p = pkg("ñandu-tools", "Tools for the CAFÉ module", 1.0);
+        assert!(matches(&p, &["ñandu", "café"]));
         assert!(!matches(&p, &["ñandú-x"]));
     }
 
     #[test]
     #[ignore = "red"]
     fn search_yay_online_is_sorted_by_popularity() {
-        let pkgs = search("yay").expect("búsqueda en el AUR");
+        let pkgs = search("yay").expect("AUR search");
         assert!(pkgs.iter().any(|p| p.name == "yay"));
         assert!(pkgs.windows(2).all(|w| w[0].popularity >= w[1].popularity));
     }
@@ -439,11 +433,11 @@ mod tests {
     #[test]
     #[ignore = "red"]
     fn info_yay_online_has_depends() {
-        let pkgs = info(&["yay".to_string()]).expect("info en el AUR");
+        let pkgs = info(&["yay".to_string()]).expect("AUR info");
         let yay = pkgs
             .iter()
             .find(|p| p.name == "yay")
-            .expect("yay en la respuesta");
+            .expect("yay in the reply");
         assert!(!yay.depends.is_empty());
     }
 }

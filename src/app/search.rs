@@ -1,5 +1,5 @@
-//! Búsqueda en repos y en el AUR, índice local, `aur::info`, PKGBUILD y el contenido del panel
-//! derecho.
+//! Searching the repos and the AUR, the local index, `aur::info`, PKGBUILD and
+//! the right panel's content.
 
 use std::collections::HashSet;
 use std::sync::mpsc::Sender;
@@ -11,28 +11,28 @@ use crate::backend::aur_index::AurIndex;
 use crate::backend::pkgbuild::{self, PkgbuildSource};
 use crate::pkg::{Details, Package, Source};
 
-/// Espera tras la última tecla antes de consultar el AUR por RPC.
+/// Wait after the last key before querying the AUR over RPC.
 const DEBOUNCE: Duration = Duration::from_millis(300);
-/// Espera tras el último cambio de selección antes de pedir `aur::info` de un paquete del AUR.
+/// Wait after the last selection change before asking `aur::info` for an AUR package.
 const INFO_DEBOUNCE: Duration = Duration::from_millis(150);
-/// Espera tras el último cambio de selección antes de descargar un PKGBUILD.
+/// Wait after the last selection change before downloading a PKGBUILD.
 const PKGBUILD_DEBOUNCE: Duration = Duration::from_millis(300);
 const INDEX_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
-/// Filas de los detalles que el RPC `search` no trae (solo `info` las tiene).
+/// Detail rows that the RPC `search` doesn't return (only `info` has them).
 const AUR_INFO_ROWS: [&str; 5] = [
-    "Licencias",
-    "Palabras clave",
-    "Depende de",
-    "Dependencias de compilación",
-    "Dependencias opcionales",
+    "Licenses",
+    "Keywords",
+    "Depends on",
+    "Make dependencies",
+    "Optional dependencies",
 ];
-const LOADING_TEXT: &str = "cargando…";
+const LOADING_TEXT: &str = "loading…";
 
 impl App {
     pub(super) fn on_query_changed(&mut self) {
         self.repo_results = self.repo.search(&self.state.query);
         self.aur_pkgs.clear();
-        // Invalida cualquier respuesta del AUR que aún esté en vuelo.
+        // Invalidate any AUR reply still in flight.
         self.aur_last_query = None;
         self.aur_generation += 1;
         self.aur_deadline = None;
@@ -61,8 +61,8 @@ impl App {
         };
     }
 
-    /// Consulta el AUR sin esperar el debounce. Con índice, busca en él. Si no, solo pide a la
-    /// red si la consulta cambió desde la última o si la anterior falló.
+    /// Queries the AUR without waiting for the debounce. With an index, searches it. Otherwise it only asks
+    /// the network if the query changed since the last one, or if that one failed.
     pub(super) fn search_aur_now(&mut self) {
         self.aur_deadline = None;
         if self.state.query.trim().is_empty() {
@@ -97,17 +97,16 @@ impl App {
 
     pub(super) fn on_aur_index(&mut self, index: AurIndex) {
         if self.aur_index.is_none() {
-            self.set_background_status(
-                format!("Índice del AUR: {} paquetes", index.len()),
-                Level::Ok,
-            );
+            let count = index.len();
+            let noun = if count == 1 { "package" } else { "packages" };
+            self.set_background_status(format!("AUR index: {count} {noun}"), Level::Ok);
         }
         self.aur_index = Some(index);
         self.seed_maintainers();
         self.recompute_aur_updates();
         self.recompute_warnings();
         if !self.state.query.trim().is_empty() {
-            // Una búsqueda RPC que siga en vuelo ya no vale: su respuesta se descarta.
+            // An RPC search still in flight is stale now: its reply is dropped.
             self.aur_generation += 1;
             self.search_local();
             self.rebuild_results();
@@ -116,7 +115,7 @@ impl App {
     }
 
     pub(super) fn on_index_error(&mut self, msg: String) {
-        self.set_background_status(format!("Índice del AUR: {msg}"), Level::Error);
+        self.set_background_status(format!("AUR index: {msg}"), Level::Error);
         if self.aur_index.is_none() && !self.aur_check_started {
             self.spawn_aur_info_check();
         }
@@ -189,7 +188,7 @@ impl App {
             Source::Repo(_) => (PkgbuildSource::Repo, self.repo.pkgbase(&p.name)),
         };
         base.map(|b| (source, b))
-            .ok_or_else(|| format!("no se encontró el paquete base de {}", p.name))
+            .ok_or_else(|| format!("couldn't find the package base of {}", p.name))
     }
 
     pub(super) fn sync_pkgbuild_view(&mut self) {
@@ -225,7 +224,7 @@ impl App {
         self.recompute_warnings();
     }
 
-    /// Recalcula los detalles del paquete seleccionado. El scroll vuelve a 0 si cambió.
+    /// Recomputes the details of the selected package. The scroll goes back to 0 if it changed.
     pub(super) fn refresh_details(&mut self) {
         let pkg = self.state.selected().cloned();
         let key: ViewKey = (
@@ -262,8 +261,8 @@ impl App {
                 }
                 return details;
             }
-            // Un paquete del AUR fuera de los resultados (una actualización): filas básicas y,
-            // mientras llega `info`, las de dependencias en "cargando…".
+            // An AUR package outside the results (an update): basic rows and,
+            // while `info` is pending, the dependency rows as "loading…".
             let mut details = basic_details(p);
             if self.info_pending(&p.name) {
                 details.extend(
@@ -285,8 +284,8 @@ impl App {
     }
 }
 
-/// Hilo del índice: carga la caché; si tiene más de un día, la refresca y vuelve a cargarla.
-/// Los errores llegan como mensaje, no son fatales.
+/// Index thread: loads the cache; if it's older than a day, refreshes it and loads it again.
+/// Errors arrive as a message; they are not fatal.
 pub(super) fn load_index(tx: &Sender<IndexMsg>) {
     let send_error = |e: anyhow::Error| {
         let _ = tx.send(IndexMsg::Error(format!("{e:#}")));
@@ -321,10 +320,10 @@ fn mark_loading(details: &mut Details) {
 
 fn basic_details(p: &Package) -> Details {
     vec![
-        ("Nombre".into(), p.name.clone()),
-        ("Versión".into(), p.version.clone()),
-        ("Descripción".into(), p.description.clone()),
-        ("Repositorio".into(), p.source.label().to_string()),
+        ("Name".into(), p.name.clone()),
+        ("Version".into(), p.version.clone()),
+        ("Description".into(), p.description.clone()),
+        ("Repository".into(), p.source.label().to_string()),
     ]
 }
 
@@ -352,7 +351,10 @@ mod tests {
 
         assert!(!app.state.input_mode);
         assert_eq!(app.state.aur_state, done);
-        assert_eq!(app.aur_generation, generation, "no debe relanzar el AUR");
+        assert_eq!(
+            app.aur_generation, generation,
+            "must not query the AUR again"
+        );
     }
 
     #[test]
@@ -362,7 +364,7 @@ mod tests {
         app.state.input_mode = true;
         let before = Instant::now();
         press(&mut app, KeyCode::Char('g'));
-        let rpc = app.aur_deadline.expect("búsqueda por RPC con debounce");
+        let rpc = app.aur_deadline.expect("RPC search with a debounce");
         assert!(rpc >= before + DEBOUNCE && rpc <= Instant::now() + DEBOUNCE);
 
         let mut app = aur_selected_app("zzfacpm-base");
@@ -373,7 +375,7 @@ mod tests {
         let (info, name) = app
             .info_deadline
             .clone()
-            .expect("pedido de info con debounce");
+            .expect("info request with a debounce");
         assert_eq!(name, FAKE);
         assert!(info >= before + INFO_DEBOUNCE && info <= Instant::now() + INFO_DEBOUNCE);
 
@@ -384,7 +386,7 @@ mod tests {
         let (at, key) = app
             .pkgbuild_deadline
             .clone()
-            .expect("descarga con debounce");
+            .expect("download with a debounce");
         assert_eq!(key, (PkgbuildSource::Aur, "zzfacpm-base".to_string()));
         assert!(at >= before + PKGBUILD_DEBOUNCE && at <= Instant::now() + PKGBUILD_DEBOUNCE);
     }
@@ -398,19 +400,19 @@ mod tests {
         assert_eq!(app.state.pkgbuild, PkgbuildView::Loading);
         assert!(
             app.pkgbuild_deadline.is_some(),
-            "la descarga debe programarse"
+            "the download must be scheduled"
         );
 
         app.pkgbuild_deadline = None;
         app.info_deadline = None;
         app.pkgbuild_inflight.insert(key.clone());
         app.pkgbuild_tx
-            .send((key.clone(), Ok("pkgname=zzfacpm-prueba\n".to_string())))
+            .send((key.clone(), Ok("pkgname=zzfacpm-test\n".to_string())))
             .unwrap();
         app.tick();
         assert_eq!(
             app.state.pkgbuild,
-            PkgbuildView::Ready("pkgname=zzfacpm-prueba\n".to_string())
+            PkgbuildView::Ready("pkgname=zzfacpm-test\n".to_string())
         );
         assert!(app.pkgbuild_inflight.is_empty());
     }
@@ -427,7 +429,7 @@ mod tests {
         );
         assert!(
             app.pkgbuild_deadline.is_none(),
-            "con caché no hace falta descargar"
+            "with a cache there's no need to download"
         );
     }
 
@@ -440,13 +442,16 @@ mod tests {
         assert_eq!(
             app.pkgbuild_inflight.len(),
             1,
-            "no debe haber un segundo pedido"
+            "there must not be a second request"
         );
 
         app.pkgbuild_inflight.clear();
         app.pkgbuild_cache.insert(key.clone(), Ok(String::new()));
         app.spawn_pkgbuild(key);
-        assert!(app.pkgbuild_inflight.is_empty(), "con caché no se descarga");
+        assert!(
+            app.pkgbuild_inflight.is_empty(),
+            "with a cache nothing is downloaded"
+        );
     }
 
     #[test]
@@ -483,7 +488,7 @@ mod tests {
             }
         );
         assert_eq!(app.state.results.len(), 1);
-        assert!(status_text(&app).contains("Índice del AUR: 1 paquetes"));
+        assert!(status_text(&app).contains("AUR index: 1 package"));
     }
 
     #[test]
@@ -502,6 +507,6 @@ mod tests {
                 local: true
             }
         );
-        assert!(app.aur_deadline.is_none(), "sin debounce");
+        assert!(app.aur_deadline.is_none(), "no debounce");
     }
 }

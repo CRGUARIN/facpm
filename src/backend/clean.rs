@@ -9,7 +9,7 @@ use anyhow::bail;
 use crate::backend::aur_index::AurIndex;
 use crate::backend::helper::Helper;
 
-/// En el orden de la lista. `PkgCacheAll` va al final por ser la más destructiva.
+/// In list order. `PkgCacheAll` goes last because it is the most destructive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CleanKind {
     Orphans,
@@ -25,14 +25,14 @@ pub struct CleanTask {
     pub kind: CleanKind,
     pub title: String,
     pub description: String,
-    /// Nombres, rutas absolutas o la ruta del índice. Vacío en paccache y en `-Scc`.
+    /// Names, absolute paths or the index path. Empty for paccache and `-Scc`.
     pub items: Vec<String>,
     pub count: usize,
-    /// Espacio a liberar; None = desconocido.
+    /// Space to free; None = unknown.
     pub bytes: Option<u64>,
-    /// Aviso o motivo de indisponibilidad.
+    /// Warning or reason it is unavailable.
     pub note: Option<String>,
-    /// Falso si no se puede ejecutar: sin paccache, sin helper AUR o sin candidatos.
+    /// False if it cannot run: no paccache, no AUR helper, or no candidates.
     pub available: bool,
 }
 
@@ -58,12 +58,12 @@ pub fn pkg_cache_dirs() -> Vec<PathBuf> {
     }
 }
 
-/// Tamaño recursivo en bytes, sin seguir enlaces.
+/// Recursive size in bytes, without following links.
 pub fn dir_size(path: &Path) -> u64 {
     tree_stats(path).0
 }
 
-/// Un enlace cuenta por su propio tamaño y no se recorre.
+/// A link counts for its own size and is not walked.
 fn tree_stats(path: &Path) -> (u64, usize) {
     let Ok(meta) = fs::symlink_metadata(path) else {
         return (0, 0);
@@ -80,7 +80,7 @@ fn tree_stats(path: &Path) -> (u64, usize) {
         .fold((0, 0), |(bytes, files), (b, f)| (bytes + b, files + f))
 }
 
-/// `paccache -d <args>` con LC_ALL=C. Ok(None) si paccache no está instalado.
+/// `paccache -d <args>` with LC_ALL=C. Ok(None) if paccache is not installed.
 pub fn paccache_estimate(args: &[&str]) -> anyhow::Result<Option<(usize, u64)>> {
     run_paccache("paccache", args)
 }
@@ -94,7 +94,7 @@ fn run_paccache(program: &str, args: &[&str]) -> anyhow::Result<Option<(usize, u
     {
         Ok(output) => output,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => bail!("no se pudo ejecutar paccache: {err}"),
+        Err(err) => bail!("couldn't run paccache: {err}"),
     };
     let text = format!(
         "{}\n{}",
@@ -106,8 +106,8 @@ fn run_paccache(program: &str, args: &[&str]) -> anyhow::Result<Option<(usize, u
             .lines()
             .rev()
             .find(|line| !line.trim().is_empty())
-            .unwrap_or("(sin salida)");
-        bail!("salida de paccache no reconocida: {last}");
+            .unwrap_or("(no output)");
+        bail!("unrecognized paccache output: {last}");
     };
     Ok(Some(estimate))
 }
@@ -151,7 +151,7 @@ fn parse_size(text: &str) -> Option<u64> {
     (value.is_finite() && value >= 0.0).then_some((value * factor) as u64)
 }
 
-/// Directorio de compilación del helper, bajo `XDG_CACHE_HOME` o `~/.cache`. Pacman no tiene.
+/// The helper build directory, under `XDG_CACHE_HOME` or `~/.cache`. Pacman has none.
 pub fn aur_cache_dir(helper: Helper) -> Option<PathBuf> {
     aur_cache_dir_from(
         helper,
@@ -160,7 +160,7 @@ pub fn aur_cache_dir(helper: Helper) -> Option<PathBuf> {
     )
 }
 
-/// Las rutas relativas se ignoran: `rm -rf` no debe resolverlas contra el directorio actual.
+/// Relative paths are ignored: `rm -rf` must not resolve them against the current directory.
 fn aur_cache_dir_from(
     helper: Helper,
     xdg_cache_home: Option<OsString>,
@@ -181,21 +181,21 @@ fn absolute_dir(value: Option<OsString>) -> Option<PathBuf> {
     value.map(PathBuf::from).filter(|path| path.is_absolute())
 }
 
-/// Las seis tareas, en el orden del enum. Puede tardar (paccache y tamaños de directorios):
-/// conviene llamarla desde un hilo. Los errores van a la `note` de cada tarea.
+/// The six tasks, in enum order. It can take a while (paccache and directory sizes):
+/// call it from a thread. Errors go to each task's `note`.
 pub fn scan(orphans: Vec<(String, u64)>, helper: Helper) -> Vec<CleanTask> {
     vec![
         orphans_task(orphans),
         paccache_task(
             CleanKind::PkgCacheKeepLatest,
-            "Caché pacman: versiones viejas",
-            "Borra de la caché todas las versiones excepto la última de cada paquete. Sin versiones anteriores no podrás volver atrás sin conexión.",
+            "Pacman cache: old versions",
+            "Deletes every version from the cache except the latest of each package. Without older versions you can't roll back offline.",
             &["-k1"],
         ),
         paccache_task(
             CleanKind::PkgCacheUninstalled,
-            "Caché pacman: desinstalados",
-            "Borra de la caché los paquetes que ya no están instalados.",
+            "Pacman cache: uninstalled",
+            "Deletes the cached packages that are no longer installed.",
             &["-uk0"],
         ),
         aur_build_cache_task(helper, aur_cache_dir(helper)),
@@ -204,7 +204,7 @@ pub fn scan(orphans: Vec<(String, u64)>, helper: Helper) -> Vec<CleanTask> {
     ]
 }
 
-/// Comando de la tarea, o None si no está disponible. No lo ejecuta.
+/// The task command, or None if it is unavailable. It does not run it.
 pub fn command(task: &CleanTask, helper: Helper) -> Option<Command> {
     if !task.available {
         return None;
@@ -247,8 +247,8 @@ fn new_task(kind: CleanKind, title: &str, description: impl Into<String>) -> Cle
 fn orphans_task(orphans: Vec<(String, u64)>) -> CleanTask {
     let mut task = new_task(
         CleanKind::Orphans,
-        "Paquetes huérfanos",
-        "Paquetes instalados como dependencia que ya ningún paquete necesita. Revisa la lista: algunos (p. ej. compiladores) pueden ser herramientas que usas directamente.",
+        "Orphaned packages",
+        "Packages installed as dependencies that no package needs anymore. Check the list: some (e.g. compilers) may be tools you use directly.",
     );
     task.count = orphans.len();
     task.bytes = Some(orphans.iter().map(|(_, size)| size).sum::<u64>());
@@ -264,36 +264,36 @@ fn paccache_task(kind: CleanKind, title: &str, description: &str, args: &[&str])
             task.count = count;
             task.bytes = Some(bytes);
         }
-        Ok(None) => task.note = Some("requiere pacman-contrib (paccache)".to_string()),
-        Err(err) => task.note = Some(format!("no se pudo estimar con paccache: {err:#}")),
+        Ok(None) => task.note = Some("requires pacman-contrib (paccache)".to_string()),
+        Err(err) => task.note = Some(format!("couldn't estimate with paccache: {err:#}")),
     }
     task.available = task.count > 0;
     task
 }
 
 fn aur_build_cache_task(helper: Helper, dir: Option<PathBuf>) -> CleanTask {
-    let title = format!("Caché de compilación AUR ({})", helper.name());
+    let title = format!("AUR build cache ({})", helper.name());
     let location = dir
         .as_ref()
-        .map_or(String::new(), |dir| format!(" en {}", dir.display()));
+        .map_or(String::new(), |dir| format!(" in {}", dir.display()));
     let description = format!(
-        "Borra los directorios de compilación del AUR{location}. Se vuelven a descargar al reinstalar o actualizar."
+        "Deletes the AUR build directories{location}. They're downloaded again when you reinstall or upgrade."
     );
     let mut task = new_task(CleanKind::AurBuildCache, &title, description);
     let Some(dir) = dir else {
         let note = if helper.supports_aur() {
-            "no se encontró el directorio de caché"
+            "cache directory not found"
         } else {
-            "no hay AUR helper"
+            "no AUR helper"
         };
         task.note = Some(note.to_string());
         return task;
     };
     match fs::read_dir(&dir) {
         Ok(entries) => {
-            // Solo directorios: `file_type` no sigue enlaces, y los archivos sueltos (vcs.json,
-            // completion.cache) quedan fuera. Las rutas no UTF-8 también: el comando debe nombrar
-            // exactamente lo que se cuenta.
+            // Directories only: `file_type` does not follow links, and loose files (vcs.json,
+            // completion.cache) are left out, and so are non-UTF-8 paths: the command must name
+            // exactly what is counted.
             let mut items: Vec<String> = entries
                 .flatten()
                 .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
@@ -305,7 +305,7 @@ fn aur_build_cache_task(helper: Helper, dir: Option<PathBuf>) -> CleanTask {
             task.items = items;
         }
         Err(err) if err.kind() == io::ErrorKind::NotFound => task.bytes = Some(0),
-        Err(err) => task.note = Some(format!("no se pudo leer {}: {err}", dir.display())),
+        Err(err) => task.note = Some(format!("couldn't read {}: {err}", dir.display())),
     }
     task.available = task.count > 0;
     task
@@ -314,8 +314,8 @@ fn aur_build_cache_task(helper: Helper, dir: Option<PathBuf>) -> CleanTask {
 fn facpm_cache_task(path: &Path) -> CleanTask {
     let mut task = new_task(
         CleanKind::FacpmCache,
-        "Caché de facpm (índice AUR)",
-        "Borra el índice local del AUR. Se vuelve a descargar la próxima vez que inicies facpm.",
+        "facpm cache (AUR index)",
+        "Deletes the local AUR index. It's downloaded again the next time you start facpm.",
     );
     task.bytes = Some(0);
     let meta = fs::symlink_metadata(path)
@@ -333,8 +333,8 @@ fn facpm_cache_task(path: &Path) -> CleanTask {
 fn pkg_cache_all_task(dirs: &[PathBuf]) -> CleanTask {
     let mut task = new_task(
         CleanKind::PkgCacheAll,
-        "Caché pacman completa",
-        "Vacía por completo la caché de pacman (pacman -Scc). No podrás reinstalar ni volver a versiones anteriores sin conexión.",
+        "Full pacman cache",
+        "Empties the whole pacman cache (pacman -Scc). You won't be able to reinstall or roll back to older versions offline.",
     );
     let (bytes, files) = dirs
         .iter()
@@ -402,14 +402,14 @@ mod tests {
             parse_paccache_output("==> no candidate packages found for pruning\n"),
             Some((0, 0))
         );
-        // Singular, y la última línea reconocible gana aunque haya ruido después.
+        // Singular, and the last recognizable line wins even if there is noise after it.
         assert_eq!(
             parse_paccache_output(
-                "==> finished dry run: 1 candidate (disk space saved: 512 B)\nruido\n"
+                "==> finished dry run: 1 candidate (disk space saved: 512 B)\nnoise\n"
             ),
             Some((1, 512))
         );
-        assert_eq!(parse_paccache_output("error: otra cosa\n"), None);
+        assert_eq!(parse_paccache_output("error: something else\n"), None);
         assert_eq!(parse_paccache_output(""), None);
     }
 
@@ -442,11 +442,11 @@ mod tests {
         fs::create_dir_all(root.join("sub/deep")).unwrap();
         fs::write(root.join("sub/b"), vec![0u8; 250]).unwrap();
         fs::write(root.join("sub/deep/c"), vec![0u8; 1]).unwrap();
-        fs::create_dir(root.join("vacio")).unwrap();
+        fs::create_dir(root.join("empty")).unwrap();
         assert_eq!(dir_size(root), 351);
         assert_eq!(dir_size(&root.join("sub")), 251);
-        assert_eq!(dir_size(&root.join("vacio")), 0);
-        assert_eq!(dir_size(&root.join("no-existe")), 0);
+        assert_eq!(dir_size(&root.join("empty")), 0);
+        assert_eq!(dir_size(&root.join("missing")), 0);
     }
 
     #[test]
@@ -454,9 +454,9 @@ mod tests {
         let tmp = TempDir::new("dir-size-link");
         let root = tmp.path();
         fs::write(root.join("file"), vec![0u8; 10]).unwrap();
-        // Si el enlace se siguiera, la recursión no terminaría.
+        // If the link were followed, the recursion would never end.
         std::os::unix::fs::symlink(".", root.join("loop")).unwrap();
-        // El enlace cuenta por su propio tamaño (la ruta "." tiene 1 byte).
+        // The link counts for its own size (the path "." is 1 byte).
         assert_eq!(dir_size(root), 11);
     }
 
@@ -581,7 +581,7 @@ mod tests {
         fs::write(dir.join("zeta/y"), vec![0u8; 7]).unwrap();
         fs::create_dir_all(dir.join("alfa")).unwrap();
         fs::write(dir.join("alfa/x"), vec![0u8; 5]).unwrap();
-        // Archivos sueltos y un enlace a un directorio: ninguno entra en items.
+        // Loose files and a link to a directory: none of them go into items.
         fs::write(dir.join("vcs.json"), b"{}").unwrap();
         fs::write(dir.join("completion.cache"), vec![0u8; 100]).unwrap();
         std::os::unix::fs::symlink("alfa", dir.join("enlace")).unwrap();
@@ -603,12 +603,12 @@ mod tests {
     #[test]
     fn aur_build_cache_empty_missing_and_pacman() {
         let tmp = TempDir::new("aur-cache-empty");
-        let empty = tmp.path().join("vacio");
+        let empty = tmp.path().join("empty");
         fs::create_dir(&empty).unwrap();
         let t = aur_build_cache_task(Helper::Yay, Some(empty));
         assert_eq!((t.count, t.available, t.note), (0, false, None));
 
-        let missing = aur_build_cache_task(Helper::Yay, Some(tmp.path().join("no-existe")));
+        let missing = aur_build_cache_task(Helper::Yay, Some(tmp.path().join("missing")));
         assert_eq!(
             (missing.count, missing.available, missing.bytes),
             (0, false, Some(0))
@@ -616,7 +616,7 @@ mod tests {
 
         let pacman = aur_build_cache_task(Helper::Pacman, None);
         assert!(!pacman.available);
-        assert_eq!(pacman.note.as_deref(), Some("no hay AUR helper"));
+        assert_eq!(pacman.note.as_deref(), Some("no AUR helper"));
         assert_eq!(pacman.bytes, None);
     }
 
@@ -631,7 +631,7 @@ mod tests {
         assert_eq!(t.bytes, Some(42));
         assert!(t.available);
 
-        let missing = facpm_cache_task(&tmp.path().join("no-existe.gz"));
+        let missing = facpm_cache_task(&tmp.path().join("missing.gz"));
         assert!(missing.items.is_empty());
         assert_eq!((missing.count, missing.available), (0, false));
     }

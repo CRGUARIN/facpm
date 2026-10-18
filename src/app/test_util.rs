@@ -1,4 +1,4 @@
-//! Ayudantes de los tests de `app`: una app con guardadores falsos y paquetes de mentira.
+//! Helpers for the `app` tests: an app with fake savers and made-up packages.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -7,13 +7,13 @@ use crate::backend::news::NewsItem;
 use crate::backend::warnings::Kind;
 use crate::pkg::Source;
 
-pub(super) const FAKE: &str = "zzfacpm-prueba";
+pub(super) const FAKE: &str = "zzfacpm-test";
 pub(super) const BEFORE: i64 = 1_600_000_000;
 pub(super) const SINCE: i64 = 1_700_000_000;
 pub(super) const AFTER: i64 = 1_700_100_000;
 
-/// App con guardadores y escáner falsos: no escribe configuración ni lee la limpieza. La base de
-/// pacman se abre como está en la máquina, solo para leer.
+/// App with fake savers and scanner: it writes no config and reads no cleanup data. The pacman
+/// database is opened as it is on this machine, read-only.
 pub(super) fn app_with(helper: Helper) -> App {
     let mut app = App::new(RepoDb::with_repo_list(no_repos).unwrap(), helper);
     app.clean_scanner = fake_scan;
@@ -42,7 +42,7 @@ pub(super) fn fake_scan(_orphans: Vec<(String, u64)>, _helper: Helper) -> Vec<Cl
     Vec::new()
 }
 
-/// Sin repos sincronizados: solo se lee la base local y no se ejecuta `pacman-conf`.
+/// No synced repos: only the local database is read and `pacman-conf` doesn't run.
 pub(super) fn no_repos() -> anyhow::Result<Vec<String>> {
     Ok(Vec::new())
 }
@@ -68,7 +68,7 @@ pub(super) fn failing_maintainers_save(_m: &Maintainers) -> anyhow::Result<()> {
 }
 
 pub(super) fn aur_pkg_version(name: &str, base: &str, version: &str, depends: &[&str]) -> AurPkg {
-    aur_json(name, base, version, 1, Some("nadie"), depends)
+    aur_json(name, base, version, 1, Some("nobody"), depends)
 }
 
 pub(super) fn aur_pkg(name: &str, depends: &[&str]) -> AurPkg {
@@ -90,7 +90,7 @@ fn aur_json(
     serde_json::from_value(serde_json::json!({
         "Name": name,
         "Version": version,
-        "Description": "paquete de prueba",
+        "Description": "test package",
         "URL": null,
         "NumVotes": votes,
         "Popularity": 0.5,
@@ -136,10 +136,10 @@ pub(super) fn aur_update(name: &str, current: &str, new: &str) -> Update {
 pub(super) fn news_item(title: &str, published: i64) -> NewsItem {
     NewsItem {
         title: title.to_string(),
-        link: "https://archlinux.org/news/prueba/".to_string(),
+        link: "https://archlinux.org/news/test/".to_string(),
         published,
         date: warnings::date(published),
-        body: "Cuerpo de la noticia de prueba.".to_string(),
+        body: "Body of a test news item.".to_string(),
     }
 }
 

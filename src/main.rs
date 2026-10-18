@@ -12,7 +12,7 @@ fn main() -> ExitCode {
     let repo = match RepoDb::new() {
         Ok(repo) => repo,
         Err(e) => {
-            eprintln!("facpm: no se pudo abrir la base de datos de paquetes: {e:#}");
+            eprintln!("facpm: couldn't open the package database: {e:#}");
             return ExitCode::FAILURE;
         }
     };

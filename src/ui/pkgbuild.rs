@@ -1,4 +1,4 @@
-//! Pestaña PKGBUILD del panel derecho: texto con números de línea y resaltado de bash.
+//! PKGBUILD tab of the right panel: text with line numbers and bash highlighting.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -19,18 +19,18 @@ pub(super) fn draw_pkgbuild(frame: &mut Frame, area: Rect, st: &mut State) {
             return draw_message(
                 frame,
                 area,
-                Line::from("Sin paquete seleccionado").style(Style::new().fg(t.muted)),
+                Line::from("No package selected").style(Style::new().fg(t.muted)),
             );
         }
         PkgbuildView::Loading => {
             return draw_message(
                 frame,
                 area,
-                Line::from("Cargando PKGBUILD…").style(Style::new().fg(t.muted)),
+                Line::from("Loading PKGBUILD…").style(Style::new().fg(t.muted)),
             );
         }
         PkgbuildView::Error(e) => {
-            let msg = format!("No se pudo obtener el PKGBUILD: {e}");
+            let msg = format!("Couldn't fetch the PKGBUILD: {e}");
             return draw_message(frame, area, Line::from(msg).style(Style::new().fg(t.red)));
         }
     };
@@ -48,7 +48,7 @@ pub(super) fn draw_pkgbuild(frame: &mut Frame, area: Rect, st: &mut State) {
     frame.render_widget(Paragraph::new(lines), area);
 }
 
-/// Tabuladores a espacios y demás caracteres de control a espacio, para no romper el dibujo.
+/// Tabs become spaces and other control characters become spaces, so the drawing does not break.
 fn code_line(t: &Theme, num: usize, num_w: usize, text: &str) -> Line<'static> {
     let clean: String = text
         .replace('\t', "    ")
@@ -83,7 +83,7 @@ fn hl_style(t: &Theme, kind: Hl) -> Style {
 enum Hl {
     Plain,
     Comment,
-    /// Nombre de una asignación al inicio de la línea (`pkgname=`, `depends+=(`).
+    /// Name of an assignment at the start of the line (`pkgname=`, `depends+=(`).
     Assign,
     Expansion,
     Str,
@@ -96,8 +96,8 @@ const BASH_KEYWORDS: &[&str] = &[
     "function", "local", "return",
 ];
 
-/// Parte una línea de PKGBUILD en trozos clasificados, que concatenados dan la línea original.
-/// No sigue estado entre líneas: un string que no cierra llega hasta el fin de su línea.
+/// Splits a PKGBUILD line into classified chunks; joined back, they give the original line.
+/// It keeps no state between lines: a string that is not closed runs to the end of its line.
 fn bash_tokens(line: &str) -> Vec<(Hl, &str)> {
     let b = line.as_bytes();
     let n = b.len();
@@ -138,7 +138,7 @@ fn bash_tokens(line: &str) -> Vec<(Hl, &str)> {
                 while i < n && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
                     i += 1;
                 }
-                // Un número no es identificador: no se resalta ni se buscan palabras dentro.
+                // A number is not an identifier: it is not highlighted and no keywords are searched in it.
                 if !(c.is_ascii_alphabetic() || c == b'_') {
                     continue;
                 }
@@ -159,8 +159,8 @@ fn bash_tokens(line: &str) -> Vec<(Hl, &str)> {
     lx.finish()
 }
 
-/// Procesa un string entre comillas dobles que empieza en `start`: el texto va como `Str` y cada
-/// `$...` como `Expansion`. Devuelve el índice después del cierre, o el fin de la línea.
+/// Handles a double-quoted string starting at `start`: the text goes as `Str` and each
+/// `$...` as `Expansion`. Returns the index after the closing quote, or the end of the line.
 fn double_quoted(lx: &mut Lexer<'_>, b: &[u8], start: usize) -> usize {
     let n = b.len();
     let mut seg = start;
@@ -190,8 +190,8 @@ fn double_quoted(lx: &mut Lexer<'_>, b: &[u8], start: usize) -> usize {
     n
 }
 
-/// Fin de la expansión que empieza en el `$` de `i` (`$var`, `${...}`, `$1`, `$@`...), o `i` si
-/// ese `$` no inicia ninguna (p. ej. `$(`).
+/// End of the expansion starting at the `$` at `i` (`$var`, `${...}`, `$1`, `$@`...), or `i` if
+/// that `$` starts none (e.g. `$(`).
 fn expansion_end(b: &[u8], i: usize) -> usize {
     let n = b.len();
     match b.get(i + 1).copied() {
@@ -218,7 +218,7 @@ struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    /// Agrega el trozo `[start, end)` con la clase `kind`, volcando antes el texto sin clasificar.
+    /// Adds the chunk `[start, end)` with class `kind`, first flushing the unclassified text before it.
     fn token(&mut self, start: usize, end: usize, kind: Hl) {
         if start >= end {
             return;
@@ -260,7 +260,7 @@ mod tests {
             "",
             "url=\"https://example.org/${pkgname}\"",
             "x = 'a''b'",
-            "echo \"# no es comentario\"",
+            "echo \"# not a comment\"",
         ];
         for line in lines {
             let joined: String = kinds(line).iter().map(|(_, part)| *part).collect();
@@ -311,13 +311,13 @@ mod tests {
         assert!(
             render_at(&mut st, WIDE, TALL)
                 .join("\n")
-                .contains("Cargando PKGBUILD…")
+                .contains("Loading PKGBUILD…")
         );
-        st.pkgbuild = PkgbuildView::Error("sin conexión".to_string());
+        st.pkgbuild = PkgbuildView::Error("offline".to_string());
         assert!(
             render_at(&mut st, WIDE, TALL)
                 .join("\n")
-                .contains("No se pudo obtener el PKGBUILD: sin conexión")
+                .contains("Couldn't fetch the PKGBUILD: offline")
         );
     }
 }

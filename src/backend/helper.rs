@@ -15,7 +15,7 @@ pub enum Helper {
 const AUR_HELPERS: [Helper; 3] = [Helper::Paru, Helper::Yay, Helper::Pikaur];
 
 impl Helper {
-    /// `FACPM_HELPER` si está instalado; si no, el primer AUR helper del PATH, o pacman.
+    /// `FACPM_HELPER` if installed; otherwise the first AUR helper in PATH, or pacman.
     pub fn detect() -> Self {
         let forced = std::env::var_os("FACPM_HELPER");
         let path = std::env::var_os("PATH");
@@ -101,7 +101,7 @@ mod tests {
     use std::ffi::OsString;
     use std::path::PathBuf;
 
-    /// Carpeta temporal que se borra al salir del test, pase o falle.
+    /// Temporary folder removed when the test exits, pass or fail.
     struct TempDir(PathBuf);
 
     impl TempDir {
@@ -120,7 +120,7 @@ mod tests {
         }
     }
 
-    /// PATH falso: una carpeta temporal con un archivo vacío por cada `(nombre, modo)`.
+    /// Fake PATH: a temporary folder with an empty file for each `(name, mode)`.
     fn fake_path(test: &str, files: &[(&str, u32)]) -> (TempDir, OsString) {
         let dir = TempDir::new(test);
         for (name, mode) in files {
@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn no_helper_on_path_means_pacman() {
-        let (_dir, path) = fake_path("none", &[("otro", 0o755)]);
+        let (_dir, path) = fake_path("none", &[("other", 0o755)]);
         assert_eq!(
             Helper::detect_with(None, Some(path.as_os_str())),
             Helper::Pacman

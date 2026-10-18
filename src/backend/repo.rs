@@ -11,7 +11,7 @@ const EMPTY: &str = "—";
 
 pub struct RepoDb {
     handle: alpm::Alpm,
-    /// De dónde salen los repos sincronizados. Los tests de `app` lo cambian: no ejecutan `pacman-conf`.
+    /// Where the synced repos come from. The `app` tests replace it, so they don't run `pacman-conf`.
     repo_list: fn() -> anyhow::Result<Vec<String>>,
 }
 
@@ -29,13 +29,13 @@ impl RepoDb {
         })
     }
 
-    /// Vuelve a abrir el handle, por ejemplo después de instalar o desinstalar.
+    /// Reopens the handle, for example after installing or uninstalling.
     pub fn reload(&mut self) -> anyhow::Result<()> {
         self.handle = open_handle(self.repo_list)?;
         Ok(())
     }
 
-    /// `source` es el repo si el paquete está en algún syncdb; si no, `Foreign`.
+    /// `source` is the repo if the package is in some syncdb; otherwise `Foreign`.
     pub fn installed(&self) -> Vec<Package> {
         let mut out: Vec<Package> = self
             .handle
@@ -58,8 +58,8 @@ impl RepoDb {
         out
     }
 
-    /// Todos los términos deben estar en el nombre o en la descripción. Orden: nombre exacto,
-    /// prefijo, nombre con todos los términos, solo descripción; a igualdad, por nombre.
+    /// All terms must appear in the name or the description. Order: exact name,
+    /// prefix, name with all terms, description only; ties sorted by name.
     pub fn search(&self, query: &str) -> Vec<Package> {
         let lowered = query.to_lowercase();
         let terms: Vec<&str> = lowered.split_whitespace().collect();
@@ -94,7 +94,7 @@ impl RepoDb {
             }
         }
 
-        // `sort_by` es estable: a igualdad de rango y nombre, se mantiene el orden de los repos.
+        // `sort_by` is stable: ties on rank and name keep the repos' order.
         hits.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.2.name().cmp(b.2.name())));
         hits.into_iter()
             .map(|(_, db, p)| {
@@ -110,7 +110,7 @@ impl RepoDb {
             .collect()
     }
 
-    /// Detalles por nombre: de la localdb si está instalado; si no, del primer syncdb que lo tenga.
+    /// Details by name: from the localdb if installed; otherwise from the first syncdb that has it.
     pub fn details(&self, name: &str) -> Option<Details> {
         let local = self.handle.localdb().pkg(name).ok();
         let (p, repo) = match (local, self.sync_pkg(name)) {
@@ -122,52 +122,52 @@ impl RepoDb {
         let installed = local.is_some();
 
         let mut rows: Details = vec![
-            row("Nombre", p.name().to_string()),
-            row("Versión", version_of(p)),
-            row("Descripción", or_dash(p.desc())),
-            row("Repositorio", repo.to_string()),
+            row("Name", p.name().to_string()),
+            row("Version", version_of(p)),
+            row("Description", or_dash(p.desc())),
+            row("Repository", repo.to_string()),
             row("URL", or_dash(p.url())),
             row(
-                "Licencias",
+                "Licenses",
                 join_list(p.licenses().iter().map(|s| s.to_string()), "  "),
             ),
             row(
-                "Depende de",
+                "Depends on",
                 join_list(p.depends().iter().map(|d| d.to_string()), "  "),
             ),
             row(
-                "Dependencias opcionales",
+                "Optional dependencies",
                 join_list(p.optdepends().iter().map(|d| d.to_string()), "\n"),
             ),
         ];
         if installed {
             rows.push(row(
-                "Requerido por",
+                "Required by",
                 join_list(p.required_by().iter().map(|s| s.to_string()), "  "),
             ));
         }
-        rows.push(row("Tamaño instalado", human_size(size_bytes(p.isize()))));
+        rows.push(row("Installed size", human_size(size_bytes(p.isize()))));
         if !installed {
-            rows.push(row("Tamaño de descarga", human_size(size_bytes(p.size()))));
+            rows.push(row("Download size", human_size(size_bytes(p.size()))));
         }
-        rows.push(row("Empaquetador", or_dash(p.packager())));
-        rows.push(row("Fecha de compilación", format_date(p.build_date())));
+        rows.push(row("Packager", or_dash(p.packager())));
+        rows.push(row("Build date", format_date(p.build_date())));
         if installed {
             let reason = match p.reason() {
-                alpm::PackageReason::Explicit => "Explícito",
-                alpm::PackageReason::Depend => "Dependencia",
+                alpm::PackageReason::Explicit => "Explicit",
+                alpm::PackageReason::Depend => "Dependency",
             };
             rows.push(row(
-                "Fecha de instalación",
+                "Install date",
                 p.install_date()
                     .map_or_else(|| EMPTY.to_string(), format_date),
             ));
-            rows.push(row("Motivo de instalación", reason.to_string()));
+            rows.push(row("Install reason", reason.to_string()));
         }
         Some(rows)
     }
 
-    /// Como `pacman -Qdt`: dependencias que nadie requiere ni tiene como opcionales.
+    /// Like `pacman -Qdt`: dependencies that nothing requires and nothing lists as optional.
     pub fn orphans(&self) -> Vec<(String, u64)> {
         let mut out: Vec<(String, u64)> = self
             .handle
@@ -186,7 +186,7 @@ impl RepoDb {
         self.handle.localdb().pkg(name).ok().map(version_of)
     }
 
-    /// `Package::base()`: de la localdb si está instalado; si no, del primer syncdb.
+    /// `Package::base()`: from the localdb if installed; otherwise from the first syncdb.
     pub fn pkgbase(&self, name: &str) -> Option<String> {
         let base = match self.handle.localdb().pkg(name) {
             Ok(pkg) => pkg.base(),
@@ -199,7 +199,7 @@ impl RepoDb {
         self.sync_pkg(name).map(|(db, _)| db.name().to_string())
     }
 
-    /// Según los syncdbs locales, que pueden estar viejos: respaldo si falla checkupdates.
+    /// From the local syncdbs, which may be stale: the fallback if checkupdates fails.
     pub fn local_updates(&self) -> Vec<Update> {
         let mut updates: Vec<Update> = self
             .handle
@@ -249,10 +249,10 @@ fn configured_repos() -> anyhow::Result<Vec<String>> {
     let output = Command::new("pacman-conf")
         .arg("--repo-list")
         .output()
-        .context("no se pudo ejecutar pacman-conf")?;
+        .context("couldn't run pacman-conf")?;
     if !output.status.success() {
         bail!(
-            "pacman-conf --repo-list falló: {}",
+            "pacman-conf --repo-list failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         );
     }
@@ -310,7 +310,7 @@ fn size_bytes(size: i64) -> u64 {
     u64::try_from(size).unwrap_or(0)
 }
 
-/// Tamaño legible en B, KiB, MiB o GiB, con un decimal salvo en bytes.
+/// Readable size in B, KiB, MiB or GiB, with one decimal except in bytes.
 pub(crate) fn human_size(bytes: u64) -> String {
     if bytes < 1024 {
         return format!("{bytes} B");
@@ -338,7 +338,7 @@ mod tests {
     use super::*;
 
     fn db() -> RepoDb {
-        RepoDb::new().expect("libalpm debe abrir en el sistema")
+        RepoDb::new().expect("libalpm must open on this system")
     }
 
     fn contains_term(p: &Package, term: &str) -> bool {
@@ -378,7 +378,7 @@ mod tests {
         let pacman = installed
             .iter()
             .find(|p| p.name == "pacman")
-            .expect("pacman debe estar instalado");
+            .expect("pacman must be installed");
         assert_eq!(pacman.source, Source::Repo("core".to_string()));
         assert_eq!(pacman.installed.as_deref(), Some(pacman.version.as_str()));
     }
@@ -392,24 +392,24 @@ mod tests {
 
     #[test]
     fn search_requires_every_term() {
-        assert!(db().search("pacman facpm-no-existe-xyz").is_empty());
+        assert!(db().search("pacman facpm-does-not-exist-xyz").is_empty());
         assert!(db().search("   ").is_empty());
     }
 
     #[test]
     fn details_of_installed_package_show_install_rows() {
-        let details = db().details("pacman").expect("pacman existe");
+        let details = db().details("pacman").expect("pacman exists");
         let keys: Vec<&str> = details.iter().map(|(k, _)| k.as_str()).collect();
-        assert_eq!(details[0], ("Nombre".to_string(), "pacman".to_string()));
-        for expected in ["Fecha de instalación", "Motivo de instalación"] {
-            assert!(keys.contains(&expected), "falta la fila {expected}");
+        assert_eq!(details[0], ("Name".to_string(), "pacman".to_string()));
+        for expected in ["Install date", "Install reason"] {
+            assert!(keys.contains(&expected), "missing the {expected} row");
         }
-        assert!(!keys.contains(&"Tamaño de descarga"));
+        assert!(!keys.contains(&"Download size"));
     }
 
     #[test]
     fn details_of_missing_package_is_none() {
-        assert!(db().details("paquete-que-no-existe-xyz").is_none());
+        assert!(db().details("package-that-does-not-exist-xyz").is_none());
     }
 
     #[test]
@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn pkgbase_repo_and_version_of_missing_package_are_none() {
         let db = db();
-        let missing = "paquete-que-no-existe-xyz";
+        let missing = "package-that-does-not-exist-xyz";
         assert_eq!(db.pkgbase(missing), None);
         assert_eq!(db.repo_of(missing), None);
         assert_eq!(db.installed_version(missing), None);
@@ -435,7 +435,7 @@ mod tests {
         for u in &updates {
             assert!(
                 alpm::vercmp(u.new.as_str(), u.current.as_str()).is_gt(),
-                "{} {} -> {} no es una actualización",
+                "{} {} -> {} is not an update",
                 u.name,
                 u.current,
                 u.new

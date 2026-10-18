@@ -1,4 +1,4 @@
-//! Estados de ejemplo y renderizado a texto o a buffer para los tests de `ui`.
+//! Sample states and text or buffer rendering for the `ui` tests.
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -21,7 +21,7 @@ pub(super) fn pkg(name: &str, version: &str, source: Source, installed: Option<&
     Package {
         name: name.to_string(),
         version: version.to_string(),
-        description: format!("Descripción de {name}"),
+        description: format!("Description of {name}"),
         source,
         installed: installed.map(str::to_string),
     }
@@ -95,17 +95,17 @@ pub(super) fn test_warning(kind: Kind, severity: Severity, label: &str) -> Warni
         kind,
         severity,
         label: label.to_string(),
-        text: format!("{label}: explicación de prueba."),
+        text: format!("{label}: test explanation."),
     }
 }
 
 pub(super) fn news_item(title: &str, published: i64) -> NewsItem {
     NewsItem {
         title: title.to_string(),
-        link: "https://archlinux.org/news/prueba/".to_string(),
+        link: "https://archlinux.org/news/test/".to_string(),
         published,
         date: warnings::date(published),
-        body: "Cuerpo de la noticia de prueba.".to_string(),
+        body: "Test news body.".to_string(),
     }
 }
 
@@ -144,7 +144,7 @@ pub(super) fn all_scenarios() -> Vec<State> {
             flagged: vec![(
                 "yay".to_string(),
                 Severity::Alarm,
-                "cambió el mantenedor".to_string(),
+                "maintainer changed".to_string(),
             )],
             news_new: 1,
             news_intervention: true,
@@ -152,14 +152,14 @@ pub(super) fn all_scenarios() -> Vec<State> {
     ];
     for modal in modals {
         let mut st = two_packages_state();
-        st.news = news_loaded(vec![news_item("Título de prueba", NEWS_AFTER)]);
+        st.news = news_loaded(vec![news_item("Test title", NEWS_AFTER)]);
         st.modal = Some(modal);
         out.push(st);
     }
     out
 }
 
-/// Renderiza `st` en una terminal de prueba de `w` x `h` y devuelve sus filas como texto.
+/// Renders `st` on a test terminal of `w` x `h` and returns its rows as text.
 pub(super) fn render_at(st: &mut State, w: u16, h: u16) -> Vec<String> {
     let buf = render_buffer(st, w, h);
     (0..h)
@@ -167,7 +167,7 @@ pub(super) fn render_at(st: &mut State, w: u16, h: u16) -> Vec<String> {
         .collect()
 }
 
-/// Renderiza `st` y devuelve el buffer completo, para revisar estilos celda por celda.
+/// Renders `st` and returns the whole buffer, to check styles cell by cell.
 pub(super) fn render_buffer(st: &mut State, w: u16, h: u16) -> Buffer {
     let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
     term.draw(|f| super::draw(f, st)).unwrap();

@@ -8,9 +8,9 @@ use chrono::{DateTime, Local, TimeZone};
 pub struct NewsItem {
     pub title: String,
     pub link: String,
-    /// Unix, a partir de `<pubDate>`.
+    /// Unix time, from `<pubDate>`.
     pub published: i64,
-    /// `YYYY-MM-DD` en hora local.
+    /// `YYYY-MM-DD` in local time.
     pub date: String,
     pub body: String,
 }
@@ -22,7 +22,7 @@ const UPGRADE_MARKER: &str = "[PACMAN] starting full system upgrade";
 const LOG_TIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S%z";
 const CDATA_OPEN: &str = "<![CDATA[";
 const CDATA_CLOSE: &str = "]]>";
-/// Longitud que se mira como máximo para una entidad: `&#x10FFFF;` ocupa 10 caracteres.
+/// Longest entity we look at: `&#x10FFFF;` is 10 characters long.
 const MAX_ENTITY_CHARS: usize = 12;
 
 pub fn fetch() -> anyhow::Result<Vec<NewsItem>> {
@@ -32,23 +32,23 @@ pub fn fetch() -> anyhow::Result<Vec<NewsItem>> {
         .build();
     let response = match agent.get(NEWS_URL).call() {
         Ok(response) => response,
-        Err(ureq::Error::Status(code, _)) => bail!("el feed de noticias respondió {code}"),
-        Err(err) => bail!("no se pudo descargar el feed de noticias: {err}"),
+        Err(ureq::Error::Status(code, _)) => bail!("the news feed answered {code}"),
+        Err(err) => bail!("couldn't download the news feed: {err}"),
     };
     if response.status() != 200 {
-        bail!("el feed de noticias respondió {}", response.status());
+        bail!("the news feed answered {}", response.status());
     }
     let xml = response
         .into_string()
-        .context("no se pudo leer el feed de noticias")?;
+        .context("couldn't read the news feed")?;
     let items = parse_rss(&xml);
     if items.is_empty() {
-        bail!("el feed de noticias no tiene entradas");
+        bail!("the news feed has no entries");
     }
     Ok(items)
 }
 
-/// Los `<item>` en orden. Los que no tienen `<pubDate>` RFC 2822 válida se descartan.
+/// The `<item>`s in order. Those without a valid RFC 2822 `<pubDate>` are dropped.
 pub fn parse_rss(xml: &str) -> Vec<NewsItem> {
     let mut items = Vec::new();
     let mut rest = xml;
@@ -104,7 +104,7 @@ fn element<'a>(block: &'a str, name: &str) -> Option<&'a str> {
     Some(&block[start..start + len])
 }
 
-/// El texto escapado se decodifica una vez; el de `<![CDATA[...]]>` se toma literal.
+/// Escaped text is decoded once; `<![CDATA[...]]>` text is taken literally.
 fn field_text(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len());
     let mut rest = raw;
@@ -122,8 +122,8 @@ fn field_text(raw: &str) -> String {
     out.trim().to_string()
 }
 
-/// HTML a texto plano: `</p>`, `<br>`, `</li>`, `</h1>`..`</h6>` y `</pre>` cortan la línea, y
-/// `<li>` abre con "• ". Dentro de `<pre>` no se colapsan espacios. Lo demás se borra.
+/// HTML to plain text: `</p>`, `<br>`, `</li>`, `</h1>`..`</h6>` and `</pre>` end the line, and
+/// `<li>` starts with "• ". Inside `<pre>` spaces are not collapsed. Everything else is dropped.
 pub fn html_to_text(html: &str) -> String {
     let mut out = String::with_capacity(html.len());
     let mut rest = html;
@@ -132,7 +132,7 @@ pub fn html_to_text(html: &str) -> String {
         push_text(&mut out, &rest[..lt], in_pre);
         let tail = &rest[lt..];
         let Some(gt) = tag_end(tail) else {
-            // Un `<` que no abre etiqueta, como en "a < b", es texto.
+            // A `<` that doesn't open a tag, as in "a < b", is text.
             out.push('<');
             rest = &tail[1..];
             continue;
@@ -228,7 +228,7 @@ fn tidy(text: &str) -> String {
     lines.join("\n").trim().to_string()
 }
 
-/// Decodifica una sola vez: `&amp;lt;` queda en `&lt;`.
+/// Decodes once: `&amp;lt;` becomes `&lt;`.
 fn decode_entities(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
@@ -281,13 +281,13 @@ fn char_code(code: &str) -> Option<u32> {
         .filter(|&value| value != 0)
 }
 
-/// Fecha del último `starting full system upgrade` del log de pacman.
+/// Date of the last `starting full system upgrade` in the pacman log.
 pub fn last_upgrade() -> Option<i64> {
     let bytes = fs::read(PACMAN_LOG).ok()?;
     last_upgrade_from(&String::from_utf8_lossy(&bytes))
 }
 
-/// Versión de `last_upgrade` sobre un texto. Las líneas cuyo timestamp no se entiende se ignoran.
+/// Version of `last_upgrade` on a string. Lines whose timestamp can't be parsed are ignored.
 pub fn last_upgrade_from(log: &str) -> Option<i64> {
     log.lines()
         .filter(|line| line.contains(UPGRADE_MARKER))
@@ -303,8 +303,8 @@ fn log_timestamp(line: &str) -> Option<i64> {
     })
 }
 
-/// ¿El título menciona a `name`? Compara token a token y sin mayúsculas: sirve `name` solo, o
-/// `name-<dígito>...` (ej. `openssh-9.8p1`). Con un solo carácter cualquier palabra coincidiría.
+/// Does the title mention `name`? Compares token by token, case-insensitively: `name` alone, or
+/// `name-<digit>...` (e.g. `openssh-9.8p1`). With a single character any word would match.
 pub fn mentions_package(title: &str, name: &str) -> bool {
     if name.chars().count() < 2 {
         return false;
@@ -312,7 +312,7 @@ pub fn mentions_package(title: &str, name: &str) -> bool {
     tokens(&without_arch_linux(title)).any(|token| is_package_token(token, name))
 }
 
-/// `to_ascii_lowercase` conserva los bytes: las posiciones sirven para `title`.
+/// `to_ascii_lowercase` keeps the byte layout, so the positions are valid for `title`.
 fn without_arch_linux(title: &str) -> String {
     let lower = title.to_ascii_lowercase();
     let mut out = String::with_capacity(title.len());
@@ -374,7 +374,7 @@ installing it again.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;Reboot afterwards.&lt;/p&gt;</description><pubDate>Tue, 22 Sep 2026 09:09:27 +0000</pubDate><guid isPermaLink="false">tag:archlinux.org,2026-09-22:/news/virtualbox-ext-vnc-7212-2-requires-manual-intervention/</guid></item>
 <item><title><![CDATA[Active AUR malicious packages incident &amp; more]]></title><link>https://archlinux.org/news/active-aur-malicious-packages-incident/</link><description><![CDATA[<p>Review <a href="https://example.org/pkgbuild">your</a> PKGBUILDs &amp; packages.</p>]]></description><pubDate>Tue, 21 Jul 2026 13:01:46 +0000</pubDate></item>
-<item><title>Sin fecha</title><link>https://archlinux.org/news/sin-fecha/</link><description>&lt;p&gt;Esta entrada no tiene pubDate.&lt;/p&gt;</description></item>
+<item><title>No date</title><link>https://archlinux.org/news/no-date/</link><description>&lt;p&gt;This entry has no pubDate.&lt;/p&gt;</description></item>
 </channel></rss>
 "##;
 
@@ -389,7 +389,7 @@ installing it again.&lt;/li&gt;
     #[test]
     fn parse_rss_decodes_escaped_fields() {
         let items = parse_rss(FEED);
-        assert_eq!(items.len(), 2, "el item sin pubDate se descarta");
+        assert_eq!(items.len(), 2, "the item without pubDate is dropped");
         let first = &items[0];
         assert_eq!(
             first.title,
@@ -430,9 +430,9 @@ installing it again.&lt;/li&gt;
         assert_eq!(html_to_text("a<br>b<br/>c<BR />d"), "a\nb\nc\nd");
         assert_eq!(
             html_to_text(
-                r#"<a href="https://x.example/?a=1&amp;b=2">enlace</a> y <b class="x">negrita</b>"#
+                r#"<a href="https://x.example/?a=1&amp;b=2">link</a> and <b class="x">bold</b>"#
             ),
-            "enlace y negrita"
+            "link and bold"
         );
     }
 
@@ -446,17 +446,17 @@ installing it again.&lt;/li&gt;
     #[test]
     fn html_to_text_turns_list_items_into_bullets() {
         assert_eq!(
-            html_to_text("<ul><li>uno</li><li>dos</li></ul>"),
-            "• uno\n• dos"
+            html_to_text("<ul><li>one</li><li>two</li></ul>"),
+            "• one\n• two"
         );
-        assert_eq!(html_to_text("<UL><LI>uno</LI></UL>"), "• uno");
+        assert_eq!(html_to_text("<UL><LI>one</LI></UL>"), "• one");
         assert_eq!(
-            html_to_text("texto<ul><li>a</li><li>b</li></ul>"),
-            "texto\n• a\n• b"
+            html_to_text("text<ul><li>a</li><li>b</li></ul>"),
+            "text\n• a\n• b"
         );
         assert_eq!(
-            html_to_text("<p>Opciones:</p>\n<ol>\n<li>uno</li>\n</ol>"),
-            "Opciones:\n• uno"
+            html_to_text("<p>Options:</p>\n<ol>\n<li>one</li>\n</ol>"),
+            "Options:\n• one"
         );
     }
 
@@ -464,9 +464,9 @@ installing it again.&lt;/li&gt;
     fn html_to_text_keeps_pre_lines_and_spaces() {
         assert_eq!(
             html_to_text(
-                "<p>Ejecutá:</p><pre><code>pacman -Rdd linux-firmware\npacman -Syu linux-firmware\n</code></pre>"
+                "<p>Run:</p><pre><code>pacman -Rdd linux-firmware\npacman -Syu linux-firmware\n</code></pre>"
             ),
-            "Ejecutá:\npacman -Rdd linux-firmware\npacman -Syu linux-firmware"
+            "Run:\npacman -Rdd linux-firmware\npacman -Syu linux-firmware"
         );
         assert_eq!(html_to_text("<pre>a    b &lt; c</pre>"), "a    b < c");
     }
@@ -493,7 +493,7 @@ installing it again.&lt;/li&gt;
 
     #[test]
     fn last_upgrade_takes_the_last_line_with_a_valid_timestamp() {
-        // 2026-10-17T11:05:47-0500; la línea de formato viejo del final se ignora.
+        // 2026-10-17T11:05:47-0500; the old-format line at the end is ignored.
         assert_eq!(last_upgrade_from(LOG), Some(1792253147));
         assert_eq!(last_upgrade_from(""), None);
         assert_eq!(
@@ -552,7 +552,7 @@ installing it again.&lt;/li&gt;
     #[test]
     #[ignore = "red"]
     fn fetch_returns_items_online() {
-        let items = fetch().expect("el feed de noticias responde");
+        let items = fetch().expect("the news feed answers");
         assert!(items.iter().any(|item| !item.title.is_empty()));
     }
 }

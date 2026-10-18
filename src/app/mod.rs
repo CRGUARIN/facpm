@@ -1,5 +1,5 @@
-//! La app: el estado que lee la interfaz más el backend. Las teclas, las acciones, las búsquedas,
-//! las comprobaciones y la limpieza están en los submódulos, que comparten `App`.
+//! The app: the state the UI reads, plus the backend. Keys, actions, searches,
+//! update checks and cleanup live in submodules that share `App`.
 
 mod actions;
 mod clean;
@@ -28,7 +28,7 @@ use crate::backend::updates::{RawUpdate, Update};
 use crate::backend::warnings::{self, Maintainers};
 use crate::pkg::Package;
 
-// Respuestas de los hilos. Una respuesta con una generación vieja se descarta.
+// Thread replies. A reply with an old generation is dropped.
 type AurMsg = (u64, anyhow::Result<Vec<AurPkg>>);
 type InfoMsg = (String, anyhow::Result<Vec<AurPkg>>);
 type PkgKey = (PkgbuildSource, String);
@@ -40,7 +40,7 @@ type NewsMsg = (u64, anyhow::Result<Vec<NewsItem>>, Option<i64>);
 type ViewKey = (Tab, RightTab, Option<String>);
 type UpdCheck = Option<Result<Vec<Update>, String>>;
 type ScanFn = fn(Vec<(String, u64)>, Helper) -> Vec<CleanTask>;
-/// Comprueba los repos: `checkupdates` en producción, una respuesta fija en los tests.
+/// Checks the repos: `checkupdates` in production, a fixed reply in tests.
 type RepoChecker = fn() -> anyhow::Result<Option<Vec<RawUpdate>>>;
 type MaintainersSaver = fn(&Maintainers) -> anyhow::Result<()>;
 type ThemeSaver = fn(&str) -> anyhow::Result<()>;
@@ -80,7 +80,7 @@ pub struct App {
     pkgbuild_deadline: Option<(Instant, PkgKey)>,
     pkgbuild_tx: Sender<PkgbuildMsg>,
     pkgbuild_rx: Receiver<PkgbuildMsg>,
-    /// Generación de la última comprobación de repos; las respuestas viejas se descartan.
+    /// Generation of the last repo check; older replies are dropped.
     repo_check_gen: u64,
     repo_checker: RepoChecker,
     repo_check: UpdCheck,
@@ -92,22 +92,22 @@ pub struct App {
     aur_upd_tx: Sender<AurCheckMsg>,
     aur_upd_rx: Receiver<AurCheckMsg>,
     clean_gen: u64,
-    /// Desde que se abrió la pestaña Limpieza, cada operación vuelve a escanear.
+    /// Once the Cleanup tab has been opened, every operation rescans it.
     clean_opened: bool,
     clean_scanner: ScanFn,
     clean_tx: Sender<CleanScanMsg>,
     clean_rx: Receiver<CleanScanMsg>,
     clean_keep: Option<CleanKind>,
-    /// Mantenedor visto por última vez de cada paquete foráneo del AUR: la línea base.
+    /// Last maintainer seen for each foreign AUR package: the baseline.
     maintainers: Maintainers,
     maintainers_saver: MaintainersSaver,
     news_gen: u64,
     news_tx: Sender<NewsMsg>,
     news_rx: Receiver<NewsMsg>,
-    /// El último comando lanzado con `u`: si termina bien, se actualiza la línea base.
+    /// Last command started with `U`: if it succeeds, the baseline is updated.
     pending_upgrade: bool,
     theme_saver: ThemeSaver,
-    /// `COLORTERM` anuncia color de 24 bits; se lee una vez, al crear la app.
+    /// `COLORTERM` announces 24-bit color; it is read once, when the app is created.
     truecolor: bool,
     should_quit: bool,
 }
@@ -197,8 +197,8 @@ impl App {
         &mut self.state
     }
 
-    /// Lo que hace el bucle principal después de una operación externa. Un `u` que terminó bien
-    /// actualiza la línea base de mantenedores.
+    /// What the main loop does after an external command. A `U` that succeeded
+    /// updates the maintainer baseline.
     pub fn after_operation(&mut self, ok: bool) {
         for marked in &mut self.state.marked {
             marked.clear();
@@ -210,15 +210,12 @@ impl App {
             self.snapshot_after_upgrade();
         }
         if ok {
-            self.set_status("✓ Operación completada", true);
+            self.set_status("✓ Operation completed", true);
         } else {
-            self.set_status("✗ La operación falló", false);
+            self.set_status("✗ The operation failed", false);
         }
         if let Err(e) = reload_result {
-            self.set_status(
-                format!("No se pudo recargar la base de datos: {e:#}"),
-                false,
-            );
+            self.set_status(format!("Couldn't reload the database: {e:#}"), false);
         }
         self.check_updates();
         if self.clean_opened {
@@ -256,7 +253,7 @@ impl App {
                     .aur_info
                     .extend(pkgs.into_iter().map(|p| (p.name.clone(), p))),
                 Err(e) => self.set_background_status(
-                    format!("AUR: no se pudo leer la información de {name}: {e:#}"),
+                    format!("AUR: couldn't read the information for {name}: {e:#}"),
                     Level::Error,
                 ),
             }
@@ -314,8 +311,8 @@ impl App {
         self.set_level(text, Level::Warn);
     }
 
-    /// Mensaje de un hilo en segundo plano: un Ok no pisa un aviso o un error todavía vigente,
-    /// así el aviso de arranque no lo tapa el índice. Las acciones del usuario usan `set_status`.
+    /// Message from a background thread: an Ok doesn't replace a warning or error still shown,
+    /// so the startup warning isn't hidden by the index. User actions use `set_status`.
     fn set_background_status(&mut self, text: impl Into<String>, level: Level) {
         let protected = self
             .state
@@ -361,7 +358,7 @@ mod tests {
         app.pending_upgrade = true;
         app.after_operation(true);
         assert!(!app.pending_upgrade);
-        assert_eq!(status_text(&app), "✓ Operación completada");
+        assert_eq!(status_text(&app), "✓ Operation completed");
         assert_eq!(level(&app), Some(Level::Ok));
     }
 
@@ -370,16 +367,16 @@ mod tests {
         let mut app = empty_app();
         app.aur_index = Some(AurIndex::from_pkgs(Vec::new()));
         app.maintainers
-            .insert("zzfacpm-f".to_string(), Some("viejo".to_string()));
+            .insert("zzfacpm-f".to_string(), Some("old".to_string()));
         app.pending_upgrade = true;
         app.after_operation(false);
         assert!(!app.pending_upgrade);
-        assert_eq!(status_text(&app), "✗ La operación falló");
+        assert_eq!(status_text(&app), "✗ The operation failed");
         assert_eq!(level(&app), Some(Level::Error));
         assert_eq!(
             app.maintainers.get("zzfacpm-f"),
-            Some(&Some("viejo".to_string())),
-            "un u fallido no toca la línea base"
+            Some(&Some("old".to_string())),
+            "a failed U doesn't touch the baseline"
         );
     }
 
@@ -388,15 +385,15 @@ mod tests {
         let mut app = empty_app();
         app.aur_index = Some(AurIndex::from_pkgs(Vec::new()));
         app.maintainers
-            .insert("zzfacpm-f".to_string(), Some("viejo".to_string()));
+            .insert("zzfacpm-f".to_string(), Some("old".to_string()));
         app.after_operation(true);
-        assert_eq!(status_text(&app), "✓ Operación completada");
+        assert_eq!(status_text(&app), "✓ Operation completed");
         assert_eq!(level(&app), Some(Level::Ok));
         assert!(!app.pending_upgrade);
         assert_eq!(
             app.maintainers.get("zzfacpm-f"),
-            Some(&Some("viejo".to_string())),
-            "sin u no hay línea base nueva"
+            Some(&Some("old".to_string())),
+            "without U there is no new baseline"
         );
     }
 
@@ -406,7 +403,7 @@ mod tests {
         app.set_status("reciente", true);
         app.state.status.as_mut().unwrap().at = Instant::now() - Duration::from_secs(3);
         app.tick();
-        assert!(app.state.status.is_some(), "3 s todavía está vigente");
+        assert!(app.state.status.is_some(), "3 s is still recent");
 
         app.state.status.as_mut().unwrap().at = Instant::now() - Duration::from_secs(5);
         app.tick();

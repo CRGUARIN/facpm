@@ -1,4 +1,4 @@
-//! Teclas de cada modo: ayuda y noticias, modales, selector de tema, edición y modo normal.
+//! Keys for each mode: help and news, modals, theme picker, typing and normal mode.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
@@ -7,11 +7,11 @@ use crate::backend::clean;
 use crate::theme::{self, THEMES};
 
 const PAGE: isize = 10;
-/// Aviso cuando el tema necesita colores RGB y la terminal no lo anuncia.
-const COLOR_WARNING: &str = "Tu terminal podría no mostrar bien colores RGB (COLORTERM)";
+/// Warning shown when the theme needs RGB colors and the terminal doesn't announce them.
+const COLOR_WARNING: &str = "Your terminal may not display RGB colors correctly (COLORTERM)";
 
 impl App {
-    /// Procesa una tecla. Devuelve una acción solo cuando el usuario confirma una operación.
+    /// Handles a key. Returns an action only when the user confirms an operation.
     pub fn handle_key(&mut self, key: KeyEvent) -> Option<Action> {
         if key.kind == KeyEventKind::Release {
             return None;
@@ -31,8 +31,8 @@ impl App {
         None
     }
 
-    /// Con la ayuda (`close` = `?`) o las noticias (`close` = `n`) abiertas, esa tecla, Esc y `q`
-    /// cierran sin salir de la app. j/k, J/K y Ctrl-d/Ctrl-u desplazan. Nada más se mueve.
+    /// With help (`close` = `?`) or news (`close` = `n`) open, that key, Esc and `q` close it
+    /// without quitting the app. j/k, J/K and Ctrl-d/Ctrl-u scroll. Nothing else moves.
     fn handle_overlay_key(&mut self, key: KeyEvent, close: char) {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let half = (self.state.help_height / 2).max(1) as i16;
@@ -61,13 +61,13 @@ impl App {
         self.state.modal = Some(Modal::News);
     }
 
-    /// Aplica el tema `id`; un id desconocido aplica el tema por defecto.
+    /// Applies the theme `id`; an unknown id applies the default theme.
     pub fn set_theme(&mut self, id: &str) {
         self.state.theme = theme::by_id(id).unwrap_or_else(theme::default_theme);
     }
 
-    /// Al arrancar: si el tema guardado necesita RGB y la terminal no lo anuncia, avisa en la
-    /// barra de estado.
+    /// On startup, if the saved theme needs RGB and the terminal doesn't announce it, warn in the
+    /// status bar.
     pub fn warn_colors_at_startup(&mut self) {
         if self.color_warning_needed() {
             self.set_warning(COLOR_WARNING);
@@ -86,8 +86,8 @@ impl App {
         });
     }
 
-    /// Con el selector abierto, j/k y las flechas eligen y aplican en vivo sin dar la vuelta.
-    /// Enter guarda; Esc, q y t vuelven al tema original.
+    /// With the picker open, j/k and the arrows pick and preview live, without wrapping.
+    /// Enter saves; Esc, q and t go back to the original theme.
     fn handle_theme_key(&mut self, key: KeyEvent) {
         let (selected, original) = match &self.state.modal {
             Some(Modal::Theme { selected, original }) => (*selected, *original),
@@ -111,18 +111,18 @@ impl App {
         }
     }
 
-    /// Enter: cierra el selector y guarda el tema. Si el guardado falla, el error va primero y
-    /// el tema queda aplicado igual.
+    /// Enter: closes the picker and saves the theme. If saving fails, the error comes first and
+    /// the theme stays applied anyway.
     fn confirm_theme(&mut self) {
         self.state.modal = None;
         let id = self.state.theme.id;
         let name = self.state.theme.name;
         match (self.theme_saver)(id) {
-            Err(e) => self.set_status(format!("No se pudo guardar el tema: {e:#}"), false),
+            Err(e) => self.set_status(format!("Couldn't save the theme: {e:#}"), false),
             Ok(()) if self.color_warning_needed() => {
-                self.set_warning(format!("Tema: {name} · {COLOR_WARNING}"));
+                self.set_warning(format!("Theme: {name} · {COLOR_WARNING}"));
             }
-            Ok(()) => self.set_status(format!("Tema: {name}"), true),
+            Ok(()) => self.set_status(format!("Theme: {name}"), true),
         }
     }
 
@@ -141,7 +141,7 @@ impl App {
         None
     }
 
-    /// `y` o Enter confirman; `n` o Esc cancelan. Cualquier otra tecla deja el modal abierto.
+    /// `y` or Enter confirm; `n` or Esc cancel. Any other key leaves the modal open.
     fn answer_modal(&mut self, key: KeyEvent) -> Option<Action> {
         let confirmed = matches!(key.code, KeyCode::Char('y' | 'Y') | KeyCode::Enter);
         let cancelled = matches!(key.code, KeyCode::Char('n' | 'N') | KeyCode::Esc);
@@ -161,7 +161,7 @@ impl App {
             Modal::Clean { task, .. } => {
                 let cmd = clean::command(&task, self.helper);
                 if cmd.is_none() {
-                    self.set_status("Esta limpieza ya no se puede ejecutar", false);
+                    self.set_status("This cleanup can no longer run", false);
                 }
                 cmd.map(Action::Run)
             }
@@ -237,11 +237,11 @@ impl App {
             }
             KeyCode::Char(' ') => self.toggle_mark(),
             KeyCode::Char('i') => self.request_install(),
-            KeyCode::Char('d') | KeyCode::Char('x') => self.request_remove(),
+            KeyCode::Char('u') | KeyCode::Char('x') => self.request_remove(),
             KeyCode::Char('c') | KeyCode::Enter if self.state.tab == Tab::Clean => {
                 self.request_clean()
             }
-            KeyCode::Char('u') => self.request_upgrade(),
+            KeyCode::Char('U') => self.request_upgrade(),
             KeyCode::Char('r') => {
                 self.reload();
                 match self.state.tab {
@@ -306,7 +306,7 @@ mod tests {
     use crate::app::{Level, RightTab};
 
     fn only_kanagawa(id: &str) -> anyhow::Result<()> {
-        anyhow::ensure!(id == "kanagawa", "se guardó {id}");
+        anyhow::ensure!(id == "kanagawa", "saved {id}");
         Ok(())
     }
 
@@ -319,8 +319,8 @@ mod tests {
 
         press(&mut app, KeyCode::Char('?'));
         press(&mut app, KeyCode::Char('q'));
-        assert!(app.state.modal.is_none(), "q cierra la ayuda");
-        assert!(!app.should_quit(), "q con la ayuda abierta no sale");
+        assert!(app.state.modal.is_none(), "q closes the help");
+        assert!(!app.should_quit(), "q with the help open doesn't quit");
     }
 
     #[test]
@@ -344,14 +344,14 @@ mod tests {
         press(&mut app, KeyCode::Char('j'));
         press(&mut app, KeyCode::Char('k'));
         assert_eq!(app.state.help_scroll, 1);
-        assert_eq!(app.state.sel(), selected, "la lista no se mueve");
+        assert_eq!(app.state.sel(), selected, "the list doesn't move");
 
         app.handle_key(ctrl('d'));
         assert_eq!(app.state.help_scroll, 6);
         app.handle_key(ctrl('u'));
         app.handle_key(ctrl('u'));
         app.handle_key(ctrl('u'));
-        assert_eq!(app.state.help_scroll, 0, "no baja de cero");
+        assert_eq!(app.state.help_scroll, 0, "doesn't go below zero");
     }
 
     #[test]
@@ -361,16 +361,16 @@ mod tests {
         assert!(matches!(app.state.modal, Some(Modal::News)));
         press(&mut app, KeyCode::Char('j'));
         assert_eq!(app.state.help_scroll, 1, "j desplaza");
-        assert_eq!(app.state.sel(), None, "la lista no se mueve");
+        assert_eq!(app.state.sel(), None, "the list doesn't move");
         press(&mut app, KeyCode::Char('n'));
-        assert!(app.state.modal.is_none(), "n cierra");
+        assert!(app.state.modal.is_none(), "n closes");
         press(&mut app, KeyCode::Char('n'));
         press(&mut app, KeyCode::Esc);
-        assert!(app.state.modal.is_none(), "Esc cierra");
+        assert!(app.state.modal.is_none(), "Esc closes");
         press(&mut app, KeyCode::Char('n'));
         press(&mut app, KeyCode::Char('q'));
-        assert!(app.state.modal.is_none(), "q cierra");
-        assert!(!app.should_quit(), "q no sale");
+        assert!(app.state.modal.is_none(), "q closes");
+        assert!(!app.should_quit(), "q doesn't quit");
     }
 
     #[test]
@@ -387,11 +387,14 @@ mod tests {
                 })
             ));
             press(&mut app, KeyCode::Char('j'));
-            assert_eq!(app.state.theme.id, "monokai", "vista previa en vivo");
+            assert_eq!(app.state.theme.id, "monokai", "live preview");
             press(&mut app, key);
-            assert!(app.state.modal.is_none(), "{key:?} cierra");
-            assert_eq!(app.state.theme.id, "kanagawa", "{key:?} vuelve al original");
-            assert!(!app.should_quit(), "{key:?} no sale");
+            assert!(app.state.modal.is_none(), "{key:?} closes");
+            assert_eq!(
+                app.state.theme.id, "kanagawa",
+                "{key:?} goes back to the original"
+            );
+            assert!(!app.should_quit(), "{key:?} doesn't quit");
         }
     }
 
@@ -404,7 +407,7 @@ mod tests {
         press(&mut app, KeyCode::Char('j'));
         press(&mut app, KeyCode::Enter);
         assert!(app.state.modal.is_none());
-        assert_eq!(status_text(&app), "Tema: Kanagawa");
+        assert_eq!(status_text(&app), "Theme: Kanagawa");
         assert_eq!(level(&app), Some(Level::Ok));
     }
 
@@ -415,9 +418,9 @@ mod tests {
         press(&mut app, KeyCode::Char('t'));
         press(&mut app, KeyCode::Char('j'));
         press(&mut app, KeyCode::Enter);
-        assert!(status_text(&app).contains("No se pudo guardar el tema"));
+        assert!(status_text(&app).contains("Couldn't save the theme"));
         assert_eq!(level(&app), Some(Level::Error));
-        assert_eq!(app.state.theme.id, "kanagawa", "queda aplicado igual");
+        assert_eq!(app.state.theme.id, "kanagawa", "it stays applied anyway");
     }
 
     #[test]
@@ -427,7 +430,7 @@ mod tests {
         press(&mut app, KeyCode::Char('t'));
         press(&mut app, KeyCode::Char('j'));
         press(&mut app, KeyCode::Enter);
-        assert!(status_text(&app).starts_with("Tema: Kanagawa · "));
+        assert!(status_text(&app).starts_with("Theme: Kanagawa · "));
         assert!(status_text(&app).contains("COLORTERM"));
         assert_eq!(level(&app), Some(Level::Warn));
 
@@ -435,7 +438,7 @@ mod tests {
         app.truecolor = false;
         press(&mut app, KeyCode::Char('t'));
         press(&mut app, KeyCode::Enter);
-        assert_eq!(status_text(&app), "Tema: Terminal");
+        assert_eq!(status_text(&app), "Theme: Terminal");
         assert_eq!(level(&app), Some(Level::Ok));
     }
 
@@ -474,12 +477,12 @@ mod tests {
         press(&mut app, KeyCode::Char('l'));
         assert_eq!(app.state.tab, Tab::Clean);
         press(&mut app, KeyCode::Char('l'));
-        assert_eq!(app.state.tab, Tab::Installed, "l da la vuelta");
+        assert_eq!(app.state.tab, Tab::Installed, "l wraps around");
         press(&mut app, KeyCode::Char('h'));
-        assert_eq!(app.state.tab, Tab::Clean, "h da la vuelta");
+        assert_eq!(app.state.tab, Tab::Clean, "h wraps around");
         press(&mut app, KeyCode::Char('2'));
         assert_eq!(app.state.tab, Tab::Search);
-        assert!(app.state.input_mode, "Buscar entra en modo edición");
+        assert!(app.state.input_mode, "Search enters typing mode");
         press(&mut app, KeyCode::Esc);
         press(&mut app, KeyCode::Char('1'));
         assert_eq!(app.state.tab, Tab::Installed);
@@ -505,7 +508,28 @@ mod tests {
         press(&mut app, KeyCode::Char('j'));
         assert_eq!(
             app.state.right_scroll, 0,
-            "cambiar de paquete resetea el scroll"
+            "changing package resets the scroll"
         );
+    }
+
+    #[test]
+    fn d_does_nothing_and_u_asks_to_uninstall() {
+        let mut app = empty_app();
+        app.state.set_installed(vec![repo_pkg("zzfacpm-a")]);
+        app.refresh_details();
+        press(&mut app, KeyCode::Char('d'));
+        assert!(app.state.modal.is_none(), "d no longer uninstalls");
+        press(&mut app, KeyCode::Char('u'));
+        assert!(
+            matches!(app.state.modal, Some(Modal::Confirm { .. })),
+            "u asks to uninstall"
+        );
+    }
+
+    #[test]
+    fn capital_u_opens_the_upgrade_modal() {
+        let mut app = empty_app();
+        press(&mut app, KeyCode::Char('U'));
+        assert!(matches!(app.state.modal, Some(Modal::Upgrade(_))));
     }
 }

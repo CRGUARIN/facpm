@@ -1,4 +1,4 @@
-//! Panel izquierdo: la lista de la pestaña activa, con su filtro o búsqueda y el título.
+//! Left panel: the list for the active tab, with its filter or search and its title.
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -19,10 +19,10 @@ use super::{fit, row_secondary, source_color};
 pub(super) fn draw_list(frame: &mut Frame, area: Rect, st: &mut State) {
     let t = st.theme;
     let title = match st.tab {
-        Tab::Installed => " Instalados ".to_string(),
-        Tab::Search => format!(" Buscar · {} ", aur_status(&st.aur_state)),
-        Tab::Updates => format!(" Actualizaciones {} ", updates_status(st)),
-        Tab::Clean => format!(" Limpieza {} ", clean_status(st)),
+        Tab::Installed => " Installed ".to_string(),
+        Tab::Search => format!(" Search · {} ", aur_status(&st.aur_state)),
+        Tab::Updates => format!(" Updates {} ", updates_status(st)),
+        Tab::Clean => format!(" Cleanup {} ", clean_status(st)),
     };
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
@@ -31,7 +31,7 @@ pub(super) fn draw_list(frame: &mut Frame, area: Rect, st: &mut State) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // En Actualizaciones el encabezado ocupa de una a tres líneas; la lista empieza debajo.
+    // In Updates the header takes one to three lines; the list starts below it.
     let header_h = if st.tab == Tab::Updates {
         updates_header_lines(st, inner.width as usize).len() as u16
     } else {
@@ -56,30 +56,30 @@ pub(super) fn draw_list(frame: &mut Frame, area: Rect, st: &mut State) {
     frame.render_stateful_widget(list, list_area, &mut st.lists[idx]);
 }
 
-/// Parte del título de Actualizaciones: "· error", "· buscando…", "· sistema al día" o
-/// "· N disponibles".
+/// Part of the Updates title: "· error", "· checking…", "· up to date" or
+/// "· N available".
 fn updates_status(st: &State) -> String {
     if st.updates_error {
         "· error".to_string()
     } else if st.updates_pending {
-        "· buscando…".to_string()
+        "· checking…".to_string()
     } else if st.updates.is_empty() {
-        "· sistema al día".to_string()
+        "· up to date".to_string()
     } else {
-        format!("· {} disponibles", st.updates.len())
+        format!("· {} available", st.updates.len())
     }
 }
 
 fn aur_status(state: &AurState) -> String {
     match state {
-        AurState::Idle => "AUR: en espera".to_string(),
-        AurState::Loading => "AUR: buscando…".to_string(),
+        AurState::Idle => "AUR: idle".to_string(),
+        AurState::Loading => "AUR: searching…".to_string(),
         AurState::Done { count, local } => {
             let source = if *local { "local" } else { "API" };
             if *count == 1 {
-                format!("AUR: 1 resultado ({source})")
+                format!("AUR: 1 result ({source})")
             } else {
-                format!("AUR: {count} resultados ({source})")
+                format!("AUR: {count} results ({source})")
             }
         }
         AurState::Error(_) => "AUR: error".to_string(),
@@ -98,21 +98,20 @@ fn draw_input(frame: &mut Frame, area: Rect, st: &State) {
     if st.tab == Tab::Clean {
         frame.render_widget(
             Paragraph::new(
-                Line::from("c/Enter: limpiar la tarea seleccionada")
-                    .style(Style::new().fg(t.muted)),
+                Line::from("c/Enter: clean the selected task").style(Style::new().fg(t.muted)),
             ),
             area,
         );
         return;
     }
     let (prefix, text) = match st.tab {
-        Tab::Search => ("Buscar: ", st.query.as_str()),
+        Tab::Search => ("Search: ", st.query.as_str()),
         _ => ("/ ", st.filter.as_str()),
     };
     let line = if text.is_empty() && !st.input_mode {
         let hint = match st.tab {
-            Tab::Search => "presiona / para buscar",
-            _ => "presiona / para filtrar",
+            Tab::Search => "press / to search",
+            _ => "press / to filter",
         };
         Line::from(Span::styled(hint, Style::new().fg(t.muted)))
     } else {
@@ -130,20 +129,20 @@ fn draw_input(frame: &mut Frame, area: Rect, st: &State) {
 
 fn empty_message(st: &State) -> &'static str {
     match st.tab {
-        Tab::Installed if st.installed.is_empty() => "No hay paquetes instalados",
-        Tab::Installed => "Ningún paquete coincide con el filtro",
-        Tab::Search if st.query.trim().is_empty() => "Escribe para buscar en repos y AUR",
-        Tab::Search if matches!(st.aur_state, AurState::Loading) => "Buscando en el AUR…",
-        Tab::Search => "Sin resultados",
-        Tab::Clean if st.clean_pending => "Calculando la limpieza…",
-        Tab::Clean => "Nada que limpiar",
-        Tab::Updates if st.updates_pending => "Comprobando actualizaciones…",
-        Tab::Updates if st.updates_error => "No se pudieron comprobar las actualizaciones",
-        Tab::Updates => "No hay actualizaciones pendientes",
+        Tab::Installed if st.installed.is_empty() => "No installed packages",
+        Tab::Installed => "No packages match the filter",
+        Tab::Search if st.query.trim().is_empty() => "Type to search the repos and the AUR",
+        Tab::Search if matches!(st.aur_state, AurState::Loading) => "Searching the AUR…",
+        Tab::Search => "No results",
+        Tab::Clean if st.clean_pending => "Scanning…",
+        Tab::Clean => "Nothing to clean",
+        Tab::Updates if st.updates_pending => "Checking for updates…",
+        Tab::Updates if st.updates_error => "Couldn't check for updates",
+        Tab::Updates => "Your system is up to date",
     }
 }
 
-/// Anchos (nombre, versión): la versión toma lo que piden sus filas, en [8, 20] y hasta 2/5.
+/// Widths (name, version): the version takes what its rows ask for, within [8, 20] and up to 2/5.
 fn column_widths(rows: &[&Package], width: usize) -> (usize, usize) {
     let longest_version = rows
         .iter()
@@ -156,7 +155,7 @@ fn column_widths(rows: &[&Package], width: usize) -> (usize, usize) {
         .max()
         .unwrap_or(0)
         .max(4);
-    // marca (2) + indicador (2) + espacio + 2 espacios antes del origen + origen
+    // mark (2) + indicator (2) + space + 2 spaces before the source + source
     let available = width.saturating_sub(2 + 2 + 1 + 2 + label_w);
     let version_w = longest_version.clamp(8, 20).min((available * 2 / 5).max(6));
     let name_w = available.saturating_sub(version_w).max(1);
@@ -202,7 +201,7 @@ fn list_lines(st: &State, width: usize) -> Vec<Line<'static>> {
         .collect()
 }
 
-/// En Buscar: ✓ si la versión instalada es la disponible, ↑ si difiere; en Instalados, ↑ si hay actualización.
+/// In Search: ✓ if the installed version is the available one, ↑ if it differs; in Installed, ↑ if there is an update.
 fn indicator(t: &Theme, tab: Tab, p: &Package, upgradable: bool) -> Span<'static> {
     match (tab, &p.installed) {
         (Tab::Search, Some(v)) if *v == p.version => Span::styled("✓ ", Style::new().fg(t.green)),
@@ -221,9 +220,9 @@ fn update_lines(st: &State, width: usize) -> Vec<Line<'static>> {
         .max()
         .unwrap_or(0)
         .max(4);
-    // marca (2) + indicador (2) + advertencia (2) + espacio + 2 espacios antes del origen + origen
+    // mark (2) + indicator (2) + warning (2) + space + 2 spaces before the source + source
     let available = width.saturating_sub(2 + 2 + 2 + 1 + 2 + label_w);
-    // Lo que pide la fila más larga, acotado; si el panel es angosto, al menos cabe "→ nueva".
+    // What the longest row asks for, capped; on a narrow panel at least "→ new" fits.
     let longest = rows.iter().map(|p| change_width(p)).max().unwrap_or(0);
     let longest_arrow = rows
         .iter()
@@ -265,7 +264,7 @@ fn change_width(p: &Package) -> usize {
     p.installed.as_deref().unwrap_or("?").chars().count() + 3 + p.version.chars().count()
 }
 
-/// Versiones en `w` columnas: "actual → nueva", luego "→ nueva", luego la nueva recortada.
+/// Versions in `w` columns: "current → new", then "→ new", then the new version cut.
 fn change_spans(t: &Theme, p: &Package, w: usize, selected: bool) -> Vec<Span<'static>> {
     let current = p.installed.as_deref().unwrap_or("?");
     let new = p.version.as_str();
@@ -291,7 +290,7 @@ fn change_spans(t: &Theme, p: &Package, w: usize, selected: bool) -> Vec<Span<'s
     vec![Span::styled(fit(new, w), green)]
 }
 
-/// Marca de advertencia: `⚠ ` en rojo o amarillo, o dos espacios; en Buscar no hay marca.
+/// Warning mark: `⚠ ` in red or yellow, or two spaces; there is no mark in Search.
 fn warning_mark(st: &State, name: &str) -> Span<'static> {
     let t = st.theme;
     if st.tab == Tab::Search {
@@ -306,22 +305,22 @@ fn warning_mark(st: &State, name: &str) -> Span<'static> {
 
 fn clean_status(st: &State) -> String {
     if st.clean_pending {
-        return "· calculando…".to_string();
+        return "· scanning…".to_string();
     }
     let any_other = st
         .clean
         .iter()
         .any(|r| r.task.available && r.task.kind != CleanKind::PkgCacheAll);
     if !any_other {
-        return "· nada que limpiar".to_string();
+        return "· nothing to clean".to_string();
     }
     format!(
-        "· ~{} recuperables",
+        "· ~{} reclaimable",
         human_size(reclaimable_bytes(&st.clean))
     )
 }
 
-/// Bytes recuperables: las tareas disponibles sin `PkgCacheAll`, que se superpone con las demás.
+/// Reclaimable bytes: the available tasks except `PkgCacheAll`, which overlaps with the others.
 fn reclaimable_bytes(rows: &[CleanRow]) -> u64 {
     rows.iter()
         .filter(|r| r.task.available && r.task.kind != CleanKind::PkgCacheAll)
@@ -329,7 +328,7 @@ fn reclaimable_bytes(rows: &[CleanRow]) -> u64 {
         .sum()
 }
 
-/// Filas de Limpieza: título a la izquierda y cantidad y tamaño a la derecha.
+/// Cleanup rows: the title on the left, count and size on the right.
 fn clean_lines(st: &State, width: usize) -> Vec<Line<'static>> {
     const RIGHT_W: usize = 18;
     let title_w = width.saturating_sub(2 + RIGHT_W).max(1);
@@ -352,7 +351,7 @@ fn clean_lines(st: &State, width: usize) -> Vec<Line<'static>> {
         .collect()
 }
 
-/// Encabezado de Actualizaciones: las partes van con " · " y se reparten en hasta tres líneas.
+/// Updates header: the parts are joined with " · " and spread over up to three lines.
 fn updates_header_lines(st: &State, width: usize) -> Vec<Line<'static>> {
     let t = st.theme;
     let budget = width.saturating_sub(1).max(1);
@@ -395,7 +394,7 @@ fn updates_header_lines(st: &State, width: usize) -> Vec<Line<'static>> {
         .collect()
 }
 
-/// Partes del encabezado: noticias, instalados fuera del AUR y actualizaciones con advertencias.
+/// Header parts: news, installed packages outside the AUR, and updates with warnings.
 fn updates_header_parts(st: &State) -> Vec<(String, Color)> {
     let t = st.theme;
     let mut parts = vec![news_header_part(st)];
@@ -405,7 +404,7 @@ fn updates_header_parts(st: &State) -> Vec<(String, Color)> {
         .filter(|ws| ws.iter().any(|w| w.kind == Kind::Missing))
         .count();
     if missing > 0 {
-        parts.push((format!("{missing} fuera del AUR"), t.yellow));
+        parts.push((format!("{missing} not in the AUR"), t.yellow));
     }
     let flagged: Vec<Severity> = st
         .updates
@@ -419,7 +418,7 @@ fn updates_header_parts(st: &State) -> Vec<(String, Color)> {
         } else {
             t.yellow
         };
-        parts.push((format!("{} con advertencias", flagged.len()), color));
+        parts.push((format!("{} with warnings", flagged.len()), color));
     }
     parts
 }
@@ -427,12 +426,12 @@ fn updates_header_parts(st: &State) -> Vec<(String, Color)> {
 fn news_header_part(st: &State) -> (String, Color) {
     let t = st.theme;
     match &st.news {
-        NewsState::Loading => ("Noticias de Arch: cargando…".to_string(), t.muted),
-        NewsState::Error(_) => ("Noticias de Arch: sin conexión".to_string(), t.muted),
+        NewsState::Loading => ("Arch news: loading…".to_string(), t.muted),
+        NewsState::Error(_) => ("Arch news: offline".to_string(), t.muted),
         NewsState::Loaded { .. } => {
             let new = st.news.new_items();
             if new.is_empty() {
-                ("Noticias de Arch: nada nuevo (n)".to_string(), t.muted)
+                ("Arch news: nothing new (n)".to_string(), t.muted)
             } else {
                 let color = if new.iter().any(|item| news::is_intervention(&item.title)) {
                     t.red
@@ -440,9 +439,9 @@ fn news_header_part(st: &State) -> (String, Color) {
                     t.yellow
                 };
                 let text = if new.len() == 1 {
-                    "Noticias de Arch: 1 nueva (n)".to_string()
+                    "Arch news: 1 new (n)".to_string()
                 } else {
-                    format!("Noticias de Arch: {} nuevas (n)", new.len())
+                    format!("Arch news: {} new (n)", new.len())
                 };
                 (text, color)
             }
@@ -495,7 +494,7 @@ mod tests {
         ];
         st.clamp_lists();
         let rows = render_at(&mut st, WIDE, TALL).join("\n");
-        // Entre el indicador y el nombre queda la columna de advertencias, vacía en Buscar.
+        // Between the indicator and the name sits the warning column, empty in Search.
         assert!(rows.contains("✓   git"));
         assert!(rows.contains("↑   git-lfs"));
         assert!(rows.contains("lazygit"));
@@ -505,8 +504,8 @@ mod tests {
     fn updates_header_splits_into_two_lines_at_120x32() {
         let mut st = updates_state();
         st.news = news_loaded(vec![
-            news_item("Uno", NEWS_AFTER),
-            news_item("Dos", NEWS_AFTER),
+            news_item("One", NEWS_AFTER),
+            news_item("Two", NEWS_AFTER),
         ]);
         st.warnings.insert(
             "firefox".to_string(),
@@ -521,8 +520,8 @@ mod tests {
             vec![test_warning(Kind::PreRelease, Severity::Warn, "x")],
         );
         let rows = render_at(&mut st, WIDE, TALL);
-        assert!(rows[2].contains("Noticias de Arch: 2 nuevas (n) · 2 fuera del AUR"));
-        assert!(rows[3].contains("3 con advertencias"));
+        assert!(rows[2].contains("Arch news: 2 new (n) · 2 not in the AUR"));
+        assert!(rows[3].contains("3 with warnings"));
     }
 
     #[test]
@@ -543,18 +542,15 @@ mod tests {
         let mut st = State::new("yay");
         st.tab = Tab::Updates;
         let rows = render_at(&mut st, WIDE, TALL);
-        assert!(rows[1].contains("· sistema al día"));
-        assert!(
-            rows.iter()
-                .any(|r| r.contains("No hay actualizaciones pendientes"))
-        );
+        assert!(rows[1].contains("· up to date"));
+        assert!(rows.iter().any(|r| r.contains("Your system is up to date")));
     }
 
     #[test]
     fn clean_title_counts_reclaimable_space_without_the_full_cache() {
         let mut st = clean_state();
         let rows = render_at(&mut st, WIDE, TALL);
-        assert!(rows[1].contains("~9.8 GiB recuperables"));
+        assert!(rows[1].contains("~9.8 GiB reclaimable"));
     }
 
     #[test]
@@ -563,6 +559,6 @@ mod tests {
         st.filter = "zzz-no-existe".to_string();
         st.refilter();
         let rows = render_at(&mut st, WIDE, TALL).join("\n");
-        assert!(rows.contains("Ningún paquete coincide con el filtro"));
+        assert!(rows.contains("No packages match the filter"));
     }
 }

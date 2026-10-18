@@ -1,4 +1,4 @@
-//! Dibujo con ratatui. `draw` solo lee `State`: no toca la base de datos ni la red.
+//! Drawing with ratatui. `draw` only reads `State`: it never touches the database or the network.
 
 mod details;
 mod help;
@@ -39,7 +39,7 @@ pub fn draw(frame: &mut Frame, st: &mut State) {
     details::draw_right(frame, right, st);
     draw_bottom_bar(frame, bottom, st);
 
-    // La ayuda y las noticias ganan sobre cualquier otro modal.
+    // Help and news win over any other modal.
     if matches!(st.modal, Some(Modal::Help)) {
         help::draw_help(frame, area, st);
         return;
@@ -67,13 +67,13 @@ fn draw_top_bar(frame: &mut Frame, area: Rect, st: &State) {
     let t = st.theme;
     let helper = format!(" helper: {} ", st.helper_name);
 
-    let installed_text = format!("1 Instalados ({})", st.installed.len());
+    let installed_text = format!("1 Installed ({})", st.installed.len());
     let search_text = if st.query.trim().is_empty() {
-        "2 Buscar".to_string()
+        "2 Search".to_string()
     } else {
-        format!("2 Buscar ({})", st.results.len())
+        format!("2 Search ({})", st.results.len())
     };
-    let updates_text = format!("3 Actualizaciones ({})", updates_count(st));
+    let updates_text = format!("3 Updates ({})", updates_count(st));
     let spans = vec![
         Span::styled(" facpm ", Style::new().bold().fg(t.on_accent).bg(t.magenta)),
         Span::raw("  "),
@@ -83,9 +83,9 @@ fn draw_top_bar(frame: &mut Frame, area: Rect, st: &State) {
         Span::raw(" "),
         tab_span(t, updates_text, st.tab == Tab::Updates),
         Span::raw(" "),
-        tab_span(t, "4 Limpieza", st.tab == Tab::Clean),
+        tab_span(t, "4 Cleanup", st.tab == Tab::Clean),
     ];
-    // En terminales angostas el helper cede su lugar a las pestañas.
+    // On narrow terminals the helper name gives way to the tabs.
     let tabs_w = line_width(&Line::from(spans.clone()));
     let helper_w = if (area.width as usize) >= tabs_w + helper.chars().count() {
         helper.chars().count() as u16
@@ -120,7 +120,7 @@ fn tab_span(t: &Theme, text: impl Into<String>, active: bool) -> Span<'static> {
     Span::styled(format!(" {} ", text.into()), style)
 }
 
-/// Firma del borde inferior del panel derecho: versión y autor si entran; solo el autor si no.
+/// Signature for the bottom border of the right panel: version and author if they fit, only the author otherwise.
 fn signature(t: &Theme, width: u16) -> Option<Line<'static>> {
     let full = format!(" facpm v{} · By CRGUARIN ", env!("CARGO_PKG_VERSION"));
     let short = " By CRGUARIN ";
@@ -154,10 +154,10 @@ fn source_color(t: &Theme, source: &Source, selected: bool) -> Color {
 
 fn draw_bottom_bar(frame: &mut Frame, area: Rect, st: &State) {
     let t = st.theme;
-    // Sin modal y sin escribir, la barra cierra con las dos salidas globales.
+    // Without a modal and not typing, the bar ends with the two global keys.
     let tail: Vec<Span<'static>> = if st.modal.is_none() && !st.input_mode {
         let mut spans = vec![Span::styled(" │ ", Style::new().fg(t.muted))];
-        spans.extend(hint_spans(t, &[("?", "ayuda"), ("q", "salir")]));
+        spans.extend(hint_spans(t, &[("?", "help"), ("q", "quit")]));
         spans
     } else {
         Vec::new()
@@ -187,51 +187,51 @@ fn draw_bottom_bar(frame: &mut Frame, area: Rect, st: &State) {
 
 fn hints(st: &State) -> Vec<(&'static str, &'static str)> {
     match &st.modal {
-        Some(Modal::Confirm { .. }) => return vec![("y/Enter", "sí"), ("n/Esc", "no")],
-        Some(Modal::Upgrade(_)) => return vec![("y/Enter", "actualizar"), ("n/Esc", "no")],
-        Some(Modal::Clean { .. }) => return vec![("y/Enter", "limpiar"), ("n/Esc", "no")],
-        Some(Modal::Help) => return vec![("j/k", "desplazar"), ("?/Esc", "cerrar")],
-        Some(Modal::News) => return vec![("j/k", "desplazar"), ("n/Esc", "cerrar")],
+        Some(Modal::Confirm { .. }) => return vec![("y/Enter", "yes"), ("n/Esc", "no")],
+        Some(Modal::Upgrade(_)) => return vec![("y/Enter", "upgrade"), ("n/Esc", "no")],
+        Some(Modal::Clean { .. }) => return vec![("y/Enter", "clean"), ("n/Esc", "no")],
+        Some(Modal::Help) => return vec![("j/k", "scroll"), ("?/Esc", "close")],
+        Some(Modal::News) => return vec![("j/k", "scroll"), ("n/Esc", "close")],
         Some(Modal::Theme { .. }) => {
-            return vec![("j/k", "elegir"), ("Enter", "guardar"), ("Esc", "cancelar")];
+            return vec![("j/k", "choose"), ("Enter", "save"), ("Esc", "cancel")];
         }
         None => {}
     }
     if st.input_mode {
-        return vec![("Enter/Esc", "terminar"), ("Ctrl-u", "borrar todo")];
+        return vec![("Enter/Esc", "done"), ("Ctrl-u", "clear")];
     }
     let other_panel = match st.right_tab {
         RightTab::Details => "PKGBUILD",
-        RightTab::Pkgbuild => "detalles",
+        RightTab::Pkgbuild => "details",
     };
     match st.tab {
         Tab::Installed => vec![
-            ("j/k", "mover"),
-            ("espacio", "marcar"),
-            ("/", "filtrar"),
-            ("d", "desinstalar"),
-            ("u", "actualizar"),
+            ("j/k", "move"),
+            ("space", "mark"),
+            ("/", "filter"),
+            ("u", "uninstall"),
+            ("U", "upgrade"),
             ("p", other_panel),
         ],
         Tab::Search => vec![
-            ("j/k", "mover"),
-            ("espacio", "marcar"),
-            ("/", "buscar"),
-            ("i", "instalar"),
-            ("u", "actualizar"),
+            ("j/k", "move"),
+            ("space", "mark"),
+            ("/", "search"),
+            ("i", "install"),
+            ("U", "upgrade"),
             ("p", other_panel),
         ],
         Tab::Clean => vec![
-            ("j/k", "mover"),
-            ("c/Enter", "limpiar"),
-            ("r", "recalcular"),
+            ("j/k", "move"),
+            ("c/Enter", "clean"),
+            ("r", "rescan"),
             ("p", other_panel),
         ],
         Tab::Updates => vec![
-            ("j/k", "mover"),
-            ("u", "actualizar sistema"),
-            ("n", "noticias"),
-            ("r", "comprobar"),
+            ("j/k", "move"),
+            ("U", "upgrade system"),
+            ("n", "news"),
+            ("r", "check"),
             ("p", other_panel),
         ],
     }
@@ -286,7 +286,7 @@ fn line_width(line: &Line<'_>) -> usize {
     line.spans.iter().map(|s| s.content.chars().count()).sum()
 }
 
-/// Filas que ocupa `lines` al partirse en un ancho de `inner_w`. Una línea vacía ocupa una.
+/// Rows `lines` take up when wrapped to `inner_w`. An empty line takes one row.
 fn rows_needed(lines: &[Line<'_>], inner_w: usize) -> usize {
     lines
         .iter()
@@ -294,7 +294,7 @@ fn rows_needed(lines: &[Line<'_>], inner_w: usize) -> usize {
         .sum()
 }
 
-/// Parte `text` en líneas de `width` caracteres; cada línea lógica (por "\n") se parte aparte.
+/// Splits `text` into lines of `width` characters; each logical line (split on "\n") is split on its own.
 fn wrap(text: &str, width: usize) -> Vec<String> {
     let width = width.max(1);
     let mut out = Vec::new();
@@ -354,7 +354,7 @@ fn word_gaps(line: &str) -> Vec<(&str, &str)> {
     parts
 }
 
-/// Etiqueta y valor; las líneas que siguen al valor van con sangría colgante, bajo la etiqueta.
+/// Label and value; the lines after the value get a hanging indent under the label.
 fn labeled_lines(label: &str, value: &str, width: usize) -> Vec<Line<'static>> {
     let label_w = label.chars().count();
     let val_w = width.saturating_sub(label_w).max(1);
@@ -409,12 +409,12 @@ mod tests {
     fn bottom_bar_hides_the_quit_hint_while_typing() {
         let mut st = two_packages_state();
         let idle = render_at(&mut st, WIDE, TALL);
-        assert!(idle[TALL as usize - 1].contains("q: salir"));
+        assert!(idle[TALL as usize - 1].contains("q: quit"));
 
         st.input_mode = true;
         let typing = render_at(&mut st, WIDE, TALL);
-        assert!(!typing[TALL as usize - 1].contains("q: salir"));
-        assert!(typing[TALL as usize - 1].contains("Enter/Esc: terminar"));
+        assert!(!typing[TALL as usize - 1].contains("q: quit"));
+        assert!(typing[TALL as usize - 1].contains("Enter/Esc: done"));
     }
 
     #[test]
@@ -426,7 +426,7 @@ mod tests {
 
     #[test]
     fn wrap_keeps_newlines_double_spaces_and_cuts_long_words() {
-        assert_eq!(wrap("uno dos\ntres", 5), ["uno", "dos", "tres"]);
+        assert_eq!(wrap("one two\nthree", 5), ["one", "two", "three"]);
         assert_eq!(wrap("a  b", 10), ["a  b"]);
         assert_eq!(wrap("abcdefgh", 3), ["abc", "def", "gh"]);
         assert_eq!(rows_needed(&[Line::from("abcdef"), Line::raw("")], 4), 3);

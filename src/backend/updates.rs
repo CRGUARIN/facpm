@@ -12,15 +12,15 @@ pub struct Update {
     pub name: String,
     pub current: String,
     pub new: String,
-    /// `Source::Repo(repo)` o `Source::Aur`.
+    /// `Source::Repo(repo)` or `Source::Aur`.
     pub source: Source,
 }
 
-/// (nombre, versión actual, versión nueva), como las imprime checkupdates.
+/// (name, current version, new version), as checkupdates prints them.
 pub type RawUpdate = (String, String, String);
 
-/// Corre `checkupdates --nocolor`. Tarda segundos, así que se llama desde un hilo.
-/// Código 2 significa "sin actualizaciones"; sin el binario devuelve `None`.
+/// Runs `checkupdates --nocolor`. It takes seconds, so it's called from a thread.
+/// Exit code 2 means "no updates"; without the binary it returns `None`.
 pub fn checkupdates() -> anyhow::Result<Option<Vec<RawUpdate>>> {
     run_checkupdates("checkupdates")
 }
@@ -29,7 +29,7 @@ fn run_checkupdates(program: &str) -> anyhow::Result<Option<Vec<RawUpdate>>> {
     let output = match Command::new(program).arg("--nocolor").output() {
         Ok(output) => output,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => bail!("no se pudo ejecutar checkupdates: {err}"),
+        Err(err) => bail!("couldn't run checkupdates: {err}"),
     };
     match output.status.code() {
         Some(0) => Ok(Some(parse_checkupdates(&String::from_utf8_lossy(
@@ -37,18 +37,18 @@ fn run_checkupdates(program: &str) -> anyhow::Result<Option<Vec<RawUpdate>>> {
         )))),
         Some(2) => Ok(Some(Vec::new())),
         code => {
-            let code = code.map_or_else(|| "sin código".to_string(), |c| c.to_string());
+            let code = code.map_or_else(|| "no exit code".to_string(), |c| c.to_string());
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stderr = stderr.trim();
             if stderr.is_empty() {
-                bail!("checkupdates falló ({code})");
+                bail!("checkupdates failed ({code})");
             }
-            bail!("checkupdates falló ({code}): {stderr}");
+            bail!("checkupdates failed ({code}): {stderr}");
         }
     }
 }
 
-/// Foráneos con versión mayor en el AUR (`alpm::vercmp`), por nombre; los demás se ignoran.
+/// Foreign packages with a newer version in the AUR (`alpm::vercmp`), by name; the rest are ignored.
 pub fn aur_updates(foreign: &[Package], aur: &[AurPkg]) -> Vec<Update> {
     let aur_by_name: HashMap<&str, &AurPkg> =
         aur.iter().map(|pkg| (pkg.name.as_str(), pkg)).collect();
@@ -101,7 +101,7 @@ mod tests {
             "LastModified": 0,
             "PackageBase": name,
         }))
-        .expect("JSON de prueba válido")
+        .expect("valid test JSON")
     }
 
     fn foreign(name: &str, installed: &str) -> Package {
@@ -178,7 +178,7 @@ mod tests {
         let installed = [
             foreign("zeta", "1.0-1"),
             foreign("alpha", "1.0-1"),
-            foreign("fuera-del-aur", "1.0-1"),
+            foreign("outside-the-aur", "1.0-1"),
         ];
         let aur = [aur_pkg("zeta", "1.1-1"), aur_pkg("alpha", "1.1-1")];
         let names: Vec<String> = aur_updates(&installed, &aur)
@@ -203,6 +203,6 @@ mod tests {
     #[test]
     #[ignore = "red"]
     fn checkupdates_online_runs() {
-        checkupdates().expect("checkupdates no debe fallar");
+        checkupdates().expect("checkupdates must not fail");
     }
 }

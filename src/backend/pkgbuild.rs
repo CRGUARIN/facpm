@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::{Context, bail};
 
-/// Dónde se busca el PKGBUILD: el AUR (cgit) o los repos oficiales (GitLab de Arch).
+/// Where the PKGBUILD is looked up: the AUR (cgit) or the official repos (Arch's GitLab).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PkgbuildSource {
     Aur,
@@ -13,7 +13,7 @@ const AUR_URL: &str = "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD";
 const GITLAB_PACKAGES: &str = "https://gitlab.archlinux.org/archlinux/packaging/packages";
 const TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Ruta en GitLab de un pkgbase, con la regla de `pkgctl`: `libsigc++` da `libsigcplusplus`.
+/// GitLab path of a pkgbase, following the `pkgctl` rule: `libsigc++` gives `libsigcplusplus`.
 pub fn gitlab_project_path(pkgbase: &str) -> String {
     let joined = join_words_around_plus(pkgbase).replace('+', "plus");
     let clean: String = joined
@@ -34,7 +34,7 @@ pub fn gitlab_project_path(pkgbase: &str) -> String {
     }
 }
 
-/// URL del PKGBUILD. En el AUR el pkgbase va como query; en GitLab, dentro del path.
+/// PKGBUILD URL. On the AUR the pkgbase goes in the query; on GitLab it goes in the path.
 pub fn url(source: PkgbuildSource, pkgbase: &str) -> String {
     match source {
         PkgbuildSource::Aur => format!("{AUR_URL}?h={}", percent_encode(pkgbase)),
@@ -45,9 +45,9 @@ pub fn url(source: PkgbuildSource, pkgbase: &str) -> String {
     }
 }
 
-/// Descarga el PKGBUILD. Cualquier respuesta que no sea 200 `text/plain` cuenta como no encontrado.
+/// Downloads the PKGBUILD. Any reply other than 200 `text/plain` counts as not found.
 pub fn fetch(source: PkgbuildSource, pkgbase: &str) -> anyhow::Result<String> {
-    // Sin seguir redirecciones: GitLab responde 302 al login cuando el proyecto no existe.
+    // Don't follow redirects: GitLab answers 302 to the login page when the project doesn't exist.
     let agent = ureq::AgentBuilder::new()
         .redirects(0)
         .timeout(TIMEOUT)
@@ -59,18 +59,18 @@ pub fn fetch(source: PkgbuildSource, pkgbase: &str) -> anyhow::Result<String> {
     };
     let response = match request.call() {
         Ok(response) => response,
-        Err(ureq::Error::Status(_, _)) => bail!("PKGBUILD no encontrado"),
-        Err(err) => bail!("no se pudo descargar el PKGBUILD: {err}"),
+        Err(ureq::Error::Status(_, _)) => bail!("PKGBUILD not found"),
+        Err(err) => bail!("couldn't download the PKGBUILD: {err}"),
     };
     let is_text = response
         .header("Content-Type")
         .is_some_and(|kind| kind.starts_with("text/plain"));
     if response.status() != 200 || !is_text {
-        bail!("PKGBUILD no encontrado");
+        bail!("PKGBUILD not found");
     }
     response
         .into_string()
-        .context("no se pudo leer el PKGBUILD descargado")
+        .context("couldn't read the downloaded PKGBUILD")
 }
 
 fn join_words_around_plus(text: &str) -> String {
@@ -197,16 +197,16 @@ mod tests {
     #[test]
     #[ignore = "red"]
     fn fetch_existing_packages_online() {
-        let aur = fetch(PkgbuildSource::Aur, "yay").expect("yay está en el AUR");
+        let aur = fetch(PkgbuildSource::Aur, "yay").expect("yay is on the AUR");
         assert!(aur.contains("pkgname=yay"));
-        let repo = fetch(PkgbuildSource::Repo, "pacman").expect("pacman está en GitLab");
+        let repo = fetch(PkgbuildSource::Repo, "pacman").expect("pacman is on GitLab");
         assert!(repo.contains("pkgname=pacman"));
     }
 
     #[test]
     #[ignore = "red"]
     fn fetch_missing_packages_is_err() {
-        let missing = "paquete-que-no-existe-xyz";
+        let missing = "package-that-does-not-exist-xyz";
         assert!(fetch(PkgbuildSource::Repo, missing).is_err());
         assert!(fetch(PkgbuildSource::Aur, missing).is_err());
     }

@@ -20,7 +20,7 @@ pub fn restore() {
     ratatui::restore()
 }
 
-/// Corre `cmd` fuera de la TUI y espera Enter. Devuelve si terminó con éxito.
+/// Runs `cmd` outside the TUI and waits for Enter. Returns whether it finished successfully.
 pub fn run_external(terminal: &mut Term, mut cmd: Command) -> anyhow::Result<bool> {
     let line = crate::backend::helper::command_line(&cmd);
     disable_raw_mode()?;
@@ -30,19 +30,19 @@ pub fn run_external(terminal: &mut Term, mut cmd: Command) -> anyhow::Result<boo
     println!("==> {line}");
     let ok = match cmd.status() {
         Ok(status) if status.success() => {
-            println!("\n==> Terminó con éxito.");
+            println!("\n==> Finished successfully.");
             true
         }
         Ok(status) => {
-            println!("\n==> Terminó con error ({status}).");
+            println!("\n==> Finished with an error ({status}).");
             false
         }
         Err(e) => {
-            println!("\nNo se pudo ejecutar el comando: {e}");
+            println!("\nCouldn't run the command: {e}");
             false
         }
     };
-    println!("Presiona Enter para volver a facpm");
+    println!("Press Enter to return to facpm");
     io::stdout().flush()?;
     let mut enter = String::new();
     io::stdin().read_line(&mut enter)?;
@@ -52,7 +52,7 @@ pub fn run_external(terminal: &mut Term, mut cmd: Command) -> anyhow::Result<boo
     while event::poll(Duration::ZERO)? {
         event::read()?;
     }
-    // `terminal.clear()` consulta el cursor, y tras un comando externo esa consulta puede fallar.
+    // `terminal.clear()` queries the cursor, and right after an external command that query can fail.
     execute!(io::stdout(), Clear(ClearType::All))?;
     *terminal = ratatui::Terminal::new(CrosstermBackend::new(io::stdout()))?;
     Ok(ok)

@@ -1,5 +1,5 @@
-//! Modales centrados: confirmación de instalar o desinstalar, actualización del sistema, limpieza
-//! y selector de tema.
+//! Centered modals: install or uninstall confirmation, system upgrade, cleanup
+//! and theme picker.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -15,9 +15,9 @@ use crate::theme::{THEMES, Theme};
 
 use super::{centered, fit, labeled_lines, rows_needed, wrap};
 
-/// Líneas de paquetes o tareas que lista un modal antes de resumir con "y N más".
+/// Packages or tasks a modal lists before summarizing with "and N more".
 const MAX_CONFIRM_LINES: usize = 10;
-/// Advertencias de actualización que lista el modal de `u` antes de resumir.
+/// Upgrade warnings the `U` modal lists before summarizing.
 const UPGRADE_WARNINGS_MAX: usize = 6;
 const THEME_PICKER_WIDTH: u16 = 44;
 
@@ -30,16 +30,16 @@ pub(super) fn draw_confirm(
     command: &str,
 ) {
     let (title, verb) = match kind {
-        OpKind::Remove => (" Desinstalar ", "Desinstalar"),
-        _ => (" Instalar ", "Instalar"),
+        OpKind::Remove => (" Uninstall ", "Uninstall"),
+        _ => (" Install ", "Install"),
     };
     let n = pkgs.len();
-    let noun = if n == 1 { "paquete" } else { "paquetes" };
+    let noun = if n == 1 { "package" } else { "packages" };
     let width = 72u16.min(screen.width);
     let inner_w = width.saturating_sub(2).max(1) as usize;
 
     let mut lines = vec![
-        Line::from(format!("¿{verb} {n} {noun}?")).bold(),
+        Line::from(format!("{verb} {n} {noun}?")).bold(),
         Line::raw(""),
     ];
     lines.extend(
@@ -49,17 +49,17 @@ pub(super) fn draw_confirm(
     );
     if n > MAX_CONFIRM_LINES {
         lines.push(
-            Line::from(format!("  y {} más", n - MAX_CONFIRM_LINES))
+            Line::from(format!("  and {} more", n - MAX_CONFIRM_LINES))
                 .style(Style::new().fg(t.muted)),
         );
     }
     lines.push(Line::raw(""));
     lines.push(Line::from(vec![
-        Span::styled("Comando: ", Style::new().bold()),
+        Span::styled("Command: ", Style::new().bold()),
         Span::raw(command.to_string()),
     ]));
     lines.push(Line::raw(""));
-    lines.push(Line::from("y/Enter: sí   n/Esc: no").style(Style::new().fg(t.cyan)));
+    lines.push(Line::from("y/Enter: yes   n/Esc: no").style(Style::new().fg(t.cyan)));
 
     let height = (rows_needed(&lines, inner_w) + 2) as u16;
     let rect = centered(screen, width, height);
@@ -83,30 +83,34 @@ pub(super) fn draw_upgrade(frame: &mut Frame, screen: Rect, t: &Theme, plan: &Up
 
     let mut lines = Vec::new();
     if plan.repos + plan.aur == 0 {
-        lines.push(
-            Line::from("No se detectaron actualizaciones; igual puedes ejecutar el comando").bold(),
-        );
+        lines.push(Line::from("No updates found; you can still run the command").bold());
     } else {
-        lines.push(Line::from(format!("{} de repos, {} del AUR", plan.repos, plan.aur)).bold());
+        lines.push(
+            Line::from(format!(
+                "{} from the repos, {} from the AUR",
+                plan.repos, plan.aur
+            ))
+            .bold(),
+        );
     }
     lines.push(Line::raw(""));
     lines.extend(plan.lines.iter().map(|l| Line::from(format!("  {l}"))));
     if plan.more > 0 {
-        lines.push(Line::from(format!("  y {} más", plan.more)).style(Style::new().fg(t.muted)));
+        lines.push(Line::from(format!("  and {} more", plan.more)).style(Style::new().fg(t.muted)));
     }
     lines.push(Line::raw(""));
     lines.push(Line::from(vec![
-        Span::styled("Comando: ", Style::new().bold()),
+        Span::styled("Command: ", Style::new().bold()),
         Span::raw(plan.command.clone()),
     ]));
     if plan.pacman_warning {
         lines.push(
-            Line::from("pacman no actualiza paquetes del AUR").style(Style::new().fg(t.yellow)),
+            Line::from("pacman doesn't upgrade AUR packages").style(Style::new().fg(t.yellow)),
         );
     }
     if !plan.flagged.is_empty() || plan.news_new > 0 {
         lines.push(Line::raw(""));
-        lines.push(Line::from("Advertencias").bold());
+        lines.push(Line::from("Warnings").bold());
         for (name, severity, label) in plan.flagged.iter().take(UPGRADE_WARNINGS_MAX) {
             let color = match severity {
                 Severity::Alarm => t.red,
@@ -116,7 +120,7 @@ pub(super) fn draw_upgrade(frame: &mut Frame, screen: Rect, t: &Theme, plan: &Up
         }
         if plan.flagged.len() > UPGRADE_WARNINGS_MAX {
             let more = plan.flagged.len() - UPGRADE_WARNINGS_MAX;
-            lines.push(Line::from(format!("… y {more} más")).style(Style::new().fg(t.muted)));
+            lines.push(Line::from(format!("… and {more} more")).style(Style::new().fg(t.muted)));
         }
         if plan.news_new > 0 {
             let color = if plan.news_intervention {
@@ -125,10 +129,10 @@ pub(super) fn draw_upgrade(frame: &mut Frame, screen: Rect, t: &Theme, plan: &Up
                 t.yellow
             };
             let text = if plan.news_new == 1 {
-                "1 noticia de Arch nueva: cancelá con Esc y apretá n para leerla".to_string()
+                "1 new Arch news post: press Esc, then n to read it".to_string()
             } else {
                 format!(
-                    "{} noticias de Arch nuevas: cancelá con Esc y apretá n para leerlas",
+                    "{} new Arch news posts: press Esc, then n to read them",
                     plan.news_new
                 )
             };
@@ -136,7 +140,7 @@ pub(super) fn draw_upgrade(frame: &mut Frame, screen: Rect, t: &Theme, plan: &Up
         }
     }
     lines.push(Line::raw(""));
-    lines.push(Line::from("y/Enter: sí   n/Esc: no").style(Style::new().fg(t.cyan)));
+    lines.push(Line::from("y/Enter: yes   n/Esc: no").style(Style::new().fg(t.cyan)));
 
     let height = (rows_needed(&lines, inner_w) + 2) as u16;
     let rect = centered(screen, width, height);
@@ -144,7 +148,7 @@ pub(super) fn draw_upgrade(frame: &mut Frame, screen: Rect, t: &Theme, plan: &Up
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(t.yellow))
         .style(Style::default().bg(t.surface).fg(t.fg))
-        .title(Line::from(" Actualizar el sistema ").bold());
+        .title(Line::from(" Upgrade system ").bold());
     frame.render_widget(Clear, rect);
     frame.render_widget(
         Paragraph::new(lines)
@@ -154,7 +158,7 @@ pub(super) fn draw_upgrade(frame: &mut Frame, screen: Rect, t: &Theme, plan: &Up
     );
 }
 
-/// Las dos tareas que borran versiones o toda la caché muestran su descripción en amarillo.
+/// The two tasks that delete versions or the whole cache show their description in yellow.
 pub(super) fn draw_clean_modal(
     frame: &mut Frame,
     screen: Rect,
@@ -167,8 +171,8 @@ pub(super) fn draw_clean_modal(
 
     let mut lines = vec![Line::from(task.title.clone()).bold()];
     let liberates = match task.bytes {
-        Some(bytes) => format!("Liberará ~{}", human_size(bytes)),
-        None => "Tamaño desconocido".to_string(),
+        Some(bytes) => format!("Frees ~{}", human_size(bytes)),
+        None => "Unknown size".to_string(),
     };
     lines.push(Line::from(liberates));
     if !task.items.is_empty() {
@@ -181,11 +185,11 @@ pub(super) fn draw_clean_modal(
         );
         if task.items.len() > MAX_CONFIRM_LINES {
             let more = task.items.len() - MAX_CONFIRM_LINES;
-            lines.push(Line::from(format!("  y {more} más")).style(Style::new().fg(t.muted)));
+            lines.push(Line::from(format!("  and {more} more")).style(Style::new().fg(t.muted)));
         }
     }
     lines.push(Line::raw(""));
-    lines.extend(labeled_lines("Comando: ", command, inner_w));
+    lines.extend(labeled_lines("Command: ", command, inner_w));
     if matches!(
         task.kind,
         CleanKind::PkgCacheAll | CleanKind::PkgCacheKeepLatest
@@ -198,7 +202,7 @@ pub(super) fn draw_clean_modal(
         );
     }
     lines.push(Line::raw(""));
-    lines.push(Line::from("y/Enter: sí   n/Esc: no").style(Style::new().fg(t.cyan)));
+    lines.push(Line::from("y/Enter: yes   n/Esc: no").style(Style::new().fg(t.cyan)));
 
     let height = (rows_needed(&lines, inner_w) + 2) as u16;
     let rect = centered(screen, width, height);
@@ -206,7 +210,7 @@ pub(super) fn draw_clean_modal(
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(t.yellow))
         .style(Style::default().bg(t.surface).fg(t.fg))
-        .title(Line::from(" Limpiar ").bold());
+        .title(Line::from(" Clean ").bold());
     frame.render_widget(Clear, rect);
     frame.render_widget(
         Paragraph::new(lines)
@@ -216,12 +220,12 @@ pub(super) fn draw_clean_modal(
     );
 }
 
-/// Una fila por tema; `●` marca el aplicado y la seleccionada va con fondo `selection`.
+/// One row per theme; `●` marks the applied one, and the selected row has the `selection` background.
 pub(super) fn draw_theme_picker(frame: &mut Frame, screen: Rect, t: &Theme, selected: usize) {
     let width = THEME_PICKER_WIDTH.min(screen.width.saturating_sub(4));
     let height = (THEMES.len() as u16 + 2).min(screen.height.saturating_sub(2));
     let inner_h = height.saturating_sub(2) as usize;
-    // Si no entra, la selección queda visible.
+    // If it does not fit, the selection stays visible.
     let offset = if selected >= inner_h {
         selected + 1 - inner_h
     } else {
@@ -266,8 +270,8 @@ pub(super) fn draw_theme_picker(frame: &mut Frame, screen: Rect, t: &Theme, sele
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(t.accent))
         .style(Style::default().bg(t.surface).fg(t.fg))
-        .title(Line::from(" Tema ").bold())
-        .title_bottom(Line::from(" Enter: guardar · Esc: cancelar ").right_aligned());
+        .title(Line::from(" Theme ").bold())
+        .title_bottom(Line::from(" Enter: save · Esc: cancel ").right_aligned());
     frame.render_widget(Clear, rect);
     frame.render_widget(Paragraph::new(rows).block(block), rect);
 }
@@ -306,8 +310,8 @@ mod tests {
 
     #[test]
     fn upgrade_modal_says_one_news_or_several() {
-        assert!(upgrade_text(1).contains("1 noticia de Arch nueva"));
-        assert!(upgrade_text(2).contains("2 noticias de Arch nuevas"));
+        assert!(upgrade_text(1).contains("1 new Arch news post"));
+        assert!(upgrade_text(2).contains("2 new Arch news posts"));
     }
 
     #[test]
@@ -315,8 +319,8 @@ mod tests {
         let mut st = State::new("yay");
         st.modal = Some(Modal::Upgrade(plan(0, 0, 0, false)));
         let text = render_at(&mut st, WIDE, 32).join("\n");
-        assert!(text.contains("No se detectaron actualizaciones"));
-        assert!(text.contains("y/Enter: sí"));
+        assert!(text.contains("No updates found"));
+        assert!(text.contains("y/Enter: yes"));
     }
 
     #[test]
@@ -324,7 +328,7 @@ mod tests {
         let mut st = State::new("yay");
         st.modal = Some(Modal::Upgrade(plan(1, 1, 0, true)));
         let text = render_at(&mut st, WIDE, 32).join("\n");
-        assert!(text.contains("pacman no actualiza paquetes del AUR"));
+        assert!(text.contains("pacman doesn't upgrade AUR packages"));
         assert!(text.contains("sudo pacman -Syu"));
     }
 
@@ -339,18 +343,18 @@ mod tests {
         assert!(
             render_at(&mut one, WIDE, 32)
                 .join("\n")
-                .contains("¿Instalar 1 paquete?")
+                .contains("Install 1 package?")
         );
 
         let mut many = two_packages_state();
         many.modal = Some(Modal::Confirm {
             kind: OpKind::Remove,
-            pkgs: (0..12).map(|i| format!("paquete-{i}")).collect(),
+            pkgs: (0..12).map(|i| format!("package-{i}")).collect(),
             command: "yay -Rns".to_string(),
         });
         let text = render_at(&mut many, WIDE, 32).join("\n");
-        assert!(text.contains("¿Desinstalar 12 paquetes?"));
-        assert!(text.contains("y 2 más"));
+        assert!(text.contains("Uninstall 12 packages?"));
+        assert!(text.contains("and 2 more"));
     }
 
     #[test]
@@ -364,7 +368,7 @@ mod tests {
         assert!(
             render_at(&mut keep, WIDE, 32)
                 .join("\n")
-                .contains("Borra de la caché todas las")
+                .contains("Deletes every version")
         );
 
         let mut orphans = clean_state();
@@ -375,7 +379,7 @@ mod tests {
         assert!(
             !render_at(&mut orphans, WIDE, 32)
                 .join("\n")
-                .contains("Borra de la caché todas las")
+                .contains("Deletes every version")
         );
     }
 

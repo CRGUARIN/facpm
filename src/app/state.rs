@@ -1,4 +1,4 @@
-//! Lo que lee la interfaz, sin base de datos ni red.
+//! What the interface reads. It does not touch the database or the network.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -77,7 +77,7 @@ pub enum OpKind {
 pub enum AurState {
     Idle,
     Loading,
-    /// `local`: los resultados salieron del índice local; si no, del RPC.
+    /// `local`: the results came from the local index; otherwise from the RPC.
     Done {
         count: usize,
         local: bool,
@@ -96,7 +96,7 @@ pub enum PkgbuildView {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CleanRow {
     pub task: CleanTask,
-    /// `None` si la tarea no se puede ejecutar.
+    /// `None` if the task cannot run.
     pub command: Option<String>,
 }
 
@@ -112,9 +112,9 @@ pub struct UpgradePlan {
     pub lines: Vec<String>,
     pub more: usize,
     pub command: String,
-    /// El helper es pacman y hay paquetes del AUR que no va a actualizar.
+    /// The helper is pacman and there are AUR packages it won't upgrade.
     pub pacman_warning: bool,
-    /// Paquetes con advertencias Warn o Alarm: nombre, peor severidad y su etiqueta.
+    /// Packages with Warn or Alert warnings: name, worst severity and its label.
     pub flagged: Vec<(String, Severity, String)>,
     pub news_new: usize,
     pub news_intervention: bool,
@@ -132,11 +132,11 @@ pub enum Modal {
         task: CleanTask,
         command: String,
     },
-    /// Mientras está abierta, las teclas son suyas.
+    /// While it is open, the keys belong to it.
     Help,
     News,
-    /// `selected` es la fila resaltada, ya aplicada en vivo; `original` el id con el que se abrió,
-    /// al que vuelven Esc, q y t.
+    /// `selected` is the highlighted row, already applied live; `original` is the id it was opened with,
+    /// which Esc, q and t go back to.
     Theme {
         selected: usize,
         original: &'static str,
@@ -150,7 +150,7 @@ pub enum Level {
     Error,
 }
 
-/// `since`: las noticias publicadas después son "nuevas" (última actualización del log, o 30 días).
+/// `since`: news published after it counts as "new" (last upgrade in the log, or 30 days).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NewsState {
     Loading,
@@ -184,7 +184,7 @@ impl Status {
 
 pub struct State {
     pub tab: Tab,
-    /// Modo edición: las teclas escriben en el filtro o en la búsqueda.
+    /// Typing mode: keys go into the filter or the search.
     pub input_mode: bool,
     pub helper_name: &'static str,
     pub theme: &'static Theme,
@@ -194,29 +194,29 @@ pub struct State {
     pub query: String,
     pub results: Vec<Package>,
     pub aur_state: AurState,
-    /// Repos primero, después AUR. La versión es la nueva y `installed` la actual.
+    /// Repos first, then AUR. The version is the new one and `installed` the current one.
     pub updates: Vec<Package>,
     pub updates_pending: bool,
     pub updates_error: bool,
-    /// Nombres con actualización, para el `↑` de Instalados.
+    /// Names with an update, for the `↑` in Installed.
     pub upgradable: HashSet<String>,
     pub warnings: HashMap<String, Vec<Warning>>,
     pub news: NewsState,
     pub clean: Vec<CleanRow>,
     pub clean_pending: bool,
-    /// El panel derecho muestra su tamaño.
+    /// The right panel shows its size.
     pub orphans: Vec<(String, u64)>,
-    /// Selección y scroll de cada lista. Índice = `Tab::idx`.
+    /// Selection and scroll of each list. Index = `Tab::idx`.
     pub lists: [ListState; 4],
     pub marked: [HashSet<String>; 4],
     pub details: Details,
     pub right_tab: RightTab,
     pub right_scroll: u16,
-    /// Lo escribe la UI al dibujar, para medir media página.
+    /// Written by the UI when drawing, to measure half a page.
     pub right_height: u16,
     pub pkgbuild: PkgbuildView,
     pub help_scroll: u16,
-    /// Lo escribe la UI al dibujar, para medir media página.
+    /// Written by the UI when drawing, to measure half a page.
     pub help_height: u16,
     pub modal: Option<Modal>,
     pub status: Option<Status>,
@@ -273,7 +273,7 @@ impl State {
         self.refilter();
     }
 
-    /// Recalcula `filtered`: cada término del filtro debe aparecer en nombre o descripción.
+    /// Recomputes `filtered`: each filter term must appear in the name or the description.
     pub fn refilter(&mut self) {
         let terms: Vec<String> = self
             .filter
@@ -343,7 +343,7 @@ impl State {
         self.lists[idx].select(Some(next));
     }
 
-    /// Selecciona la fila `i`, acotada a la lista. `usize::MAX` es la última.
+    /// Selects row `i`, clamped to the list. `usize::MAX` is the last one.
     pub fn go_to(&mut self, i: usize) {
         let n = self.len_of(self.tab);
         let idx = self.tab.idx();
@@ -354,7 +354,7 @@ impl State {
         self.go_to(0);
     }
 
-    /// Deja la selección dentro de rango: 0 si hay filas, None si la lista está vacía.
+    /// Keeps the selection in range: 0 if there are rows, None if the list is empty.
     pub fn clamp_lists(&mut self) {
         for tab in [Tab::Installed, Tab::Search, Tab::Updates, Tab::Clean] {
             let n = self.len_of(tab);
@@ -369,7 +369,7 @@ impl State {
     }
 }
 
-/// Tareas de limpieza falsas para los tests: no leen el sistema ni ejecutan nada.
+/// Fake cleanup tasks for the tests: they do not read the system or run anything.
 #[cfg(test)]
 pub(crate) fn sample_clean_tasks() -> Vec<CleanTask> {
     use crate::backend::clean::CleanKind;
@@ -380,8 +380,8 @@ pub(crate) fn sample_clean_tasks() -> Vec<CleanTask> {
     vec![
         CleanTask {
             kind: CleanKind::Orphans,
-            title: "Paquetes huérfanos".to_string(),
-            description: "Paquetes instalados como dependencia que ya ningún paquete necesita."
+            title: "Orphaned packages".to_string(),
+            description: "Packages installed as dependencies that no package needs anymore."
                 .to_string(),
             items: vec!["go".to_string(), "libxml2-legacy".to_string()],
             count: 2,
@@ -391,8 +391,8 @@ pub(crate) fn sample_clean_tasks() -> Vec<CleanTask> {
         },
         CleanTask {
             kind: CleanKind::PkgCacheKeepLatest,
-            title: "Caché pacman: versiones viejas".to_string(),
-            description: "Borra de la caché todas las versiones excepto la última de cada paquete. Sin versiones anteriores no podrás volver atrás sin conexión.".to_string(),
+            title: "Pacman cache: old versions".to_string(),
+            description: "Deletes every version from the cache except the latest of each package. Without older versions you can't roll back offline.".to_string(),
             items: Vec::new(),
             count: 51,
             bytes: Some(4 * GIB + 600 * MIB),
@@ -401,22 +401,22 @@ pub(crate) fn sample_clean_tasks() -> Vec<CleanTask> {
         },
         CleanTask {
             kind: CleanKind::PkgCacheUninstalled,
-            title: "Caché pacman: desinstalados".to_string(),
-            description: "Borra de la caché los paquetes que ya no están instalados.".to_string(),
+            title: "Pacman cache: uninstalled".to_string(),
+            description: "Deletes the cached packages that are no longer installed.".to_string(),
             items: Vec::new(),
             count: 0,
             bytes: None,
-            note: Some("requiere pacman-contrib (paccache)".to_string()),
+            note: Some("requires pacman-contrib (paccache)".to_string()),
             available: false,
         },
         CleanTask {
             kind: CleanKind::AurBuildCache,
-            title: "Caché de compilación AUR (yay)".to_string(),
-            description: "Borra los directorios de compilación del AUR en /home/usuario/.cache/yay."
+            title: "AUR build cache (yay)".to_string(),
+            description: "Deletes the AUR build directories in /home/user/.cache/yay. They're downloaded again when you reinstall or upgrade."
                 .to_string(),
             items: vec![
-                "/home/usuario/.cache/yay/go-tools".to_string(),
-                "/home/usuario/.cache/yay/zen-browser-bin".to_string(),
+                "/home/user/.cache/yay/go-tools".to_string(),
+                "/home/user/.cache/yay/zen-browser-bin".to_string(),
             ],
             count: 2,
             bytes: Some(5 * GIB),
@@ -425,9 +425,9 @@ pub(crate) fn sample_clean_tasks() -> Vec<CleanTask> {
         },
         CleanTask {
             kind: CleanKind::FacpmCache,
-            title: "Caché de facpm (índice AUR)".to_string(),
-            description: "Borra el índice local del AUR. Se vuelve a descargar la próxima vez que inicies facpm.".to_string(),
-            items: vec!["/home/usuario/.cache/facpm/packages-meta-v1.json.gz".to_string()],
+            title: "facpm cache (AUR index)".to_string(),
+            description: "Deletes the local AUR index. It's downloaded again the next time you start facpm.".to_string(),
+            items: vec!["/home/user/.cache/facpm/packages-meta-v1.json.gz".to_string()],
             count: 1,
             bytes: Some(10 * MIB),
             note: None,
@@ -435,8 +435,8 @@ pub(crate) fn sample_clean_tasks() -> Vec<CleanTask> {
         },
         CleanTask {
             kind: CleanKind::PkgCacheAll,
-            title: "Caché pacman completa".to_string(),
-            description: "Vacía por completo la caché de pacman (pacman -Scc). No podrás reinstalar ni volver a versiones anteriores sin conexión.".to_string(),
+            title: "Full pacman cache".to_string(),
+            description: "Empties the whole pacman cache (pacman -Scc). You won't be able to reinstall or roll back to older versions offline.".to_string(),
             items: Vec::new(),
             count: 1200,
             bytes: Some(12 * GIB),
@@ -476,9 +476,9 @@ mod tests {
     fn filter_needs_every_term_in_name_or_description() {
         let mut st = State::new("pacman");
         st.set_installed(vec![
-            pkg("git", "control de versiones"),
-            pkg("lazygit", "interfaz de terminal para git"),
-            pkg("vim", "editor de texto"),
+            pkg("git", "version control"),
+            pkg("lazygit", "terminal interface for git"),
+            pkg("vim", "text editor"),
         ]);
         st.filter = "git terminal".to_string();
         st.refilter();
@@ -554,7 +554,7 @@ mod tests {
 
         assert!(st.selected_clean().is_none());
         st.tab = Tab::Clean;
-        let row = st.selected_clean().expect("hay filas de limpieza");
+        let row = st.selected_clean().expect("there are cleanup rows");
         assert_eq!(row.task.kind, CleanKind::Orphans);
         assert_eq!(row.command.as_deref(), Some("yay -Rns go libxml2-legacy"));
     }
@@ -570,7 +570,7 @@ mod tests {
 
         assert!(NewsState::Loading.new_items().is_empty());
         assert!(
-            NewsState::Error("sin red".to_string())
+            NewsState::Error("offline".to_string())
                 .new_items()
                 .is_empty()
         );

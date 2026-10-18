@@ -1,22 +1,22 @@
-//! Paletas de color. Todos los colores de la interfaz salen de acá.
+//! Color palettes. Every color in the UI comes from here.
 
 use ratatui::style::Color;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Theme {
-    /// Nombre estable: es el que se guarda en la configuración.
+    /// Stable name: this is the one saved in the configuration.
     pub id: &'static str,
     pub name: &'static str,
     pub bg: Color,
-    /// Fondo de modales y ventanas flotantes.
+    /// Background of modals and floating windows.
     pub surface: Color,
-    /// Fondo de la fila seleccionada.
+    /// Background of the selected row.
     pub selection: Color,
     pub fg: Color,
-    /// Texto secundario: números de línea, notas.
+    /// Secondary text: line numbers, notes.
     pub muted: Color,
     pub border: Color,
-    /// Borde del panel con foco, pestaña activa, encabezados.
+    /// Border of the focused panel, active tab, headers.
     pub accent: Color,
     pub on_accent: Color,
     pub red: Color,
@@ -31,7 +31,7 @@ const fn rgb(hex: u32) -> Color {
     Color::Rgb((hex >> 16) as u8, (hex >> 8) as u8, hex as u8)
 }
 
-/// Todos los temas, en el orden del selector. El primero es el de por defecto.
+/// All themes, in picker order. The first one is the default.
 pub const THEMES: &[Theme] = &[
     Theme {
         id: "terminal",
@@ -259,7 +259,7 @@ pub fn by_id(id: &str) -> Option<&'static Theme> {
     THEMES.iter().find(|theme| theme.id == id)
 }
 
-/// Posición en `THEMES`, para marcar el tema en el selector.
+/// Position in `THEMES`, to mark the theme in the picker.
 pub fn index_of(id: &str) -> Option<usize> {
     THEMES.iter().position(|theme| theme.id == id)
 }

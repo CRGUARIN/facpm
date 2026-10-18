@@ -1,4 +1,4 @@
-//! Panel derecho: Detalles (con las advertencias primero), detalles de Limpieza y mensajes.
+//! Right panel: Details (warnings first), Cleanup details and messages.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -19,7 +19,7 @@ pub(super) fn draw_right(frame: &mut Frame, area: Rect, st: &mut State) {
     let t = st.theme;
     let title = Line::from(vec![
         Span::raw(" "),
-        tab_span(t, "Detalles", st.right_tab == RightTab::Details),
+        tab_span(t, "Details", st.right_tab == RightTab::Details),
         Span::raw(" │ "),
         tab_span(t, "PKGBUILD", st.right_tab == RightTab::Pkgbuild),
         Span::raw(" "),
@@ -40,7 +40,7 @@ pub(super) fn draw_right(frame: &mut Frame, area: Rect, st: &mut State) {
         (Tab::Clean, RightTab::Pkgbuild) => draw_message(
             frame,
             inner,
-            Line::from("No aplica en Limpieza").style(Style::new().fg(t.muted)),
+            Line::from("Not available in Cleanup").style(Style::new().fg(t.muted)),
         ),
         (Tab::Clean, RightTab::Details) => draw_clean_details(frame, inner, st),
         (_, RightTab::Details) => draw_details(frame, inner, st),
@@ -51,7 +51,7 @@ pub(super) fn draw_right(frame: &mut Frame, area: Rect, st: &mut State) {
 fn draw_details(frame: &mut Frame, area: Rect, st: &mut State) {
     let t = st.theme;
     let width = area.width as usize;
-    // Primero las advertencias del paquete seleccionado; después, los datos del paquete.
+    // Warnings for the selected package come first, then its data.
     let mut lines = Vec::new();
     if matches!(st.tab, Tab::Installed | Tab::Updates)
         && let Some(ws) = st.selected().and_then(|pkg| st.warnings.get(&pkg.name))
@@ -65,10 +65,10 @@ fn draw_details(frame: &mut Frame, area: Rect, st: &mut State) {
     frame.render_widget(Paragraph::new(lines).scroll((st.right_scroll, 0)), area);
 }
 
-/// Filas clave/valor con sangría colgante: cada línea del valor queda alineada en su columna.
+/// Key/value rows with a hanging indent: every line of a value stays aligned in its column.
 fn details_lines(t: &Theme, details: &Details, width: usize) -> Vec<Line<'static>> {
     if details.is_empty() {
-        return vec![Line::from("Sin paquete seleccionado").style(Style::new().fg(t.muted))];
+        return vec![Line::from("No package selected").style(Style::new().fg(t.muted))];
     }
     let longest_key = details
         .iter()
@@ -87,7 +87,8 @@ fn details_lines(t: &Theme, details: &Details, width: usize) -> Vec<Line<'static
         };
         for (i, part) in wrap(value, val_w).into_iter().enumerate() {
             let head = if i == 0 {
-                Span::styled(fit(key, key_w), Style::new().fg(t.cyan).bold())
+                let key = format!("{} ", fit(key, key_w - 1));
+                Span::styled(key, Style::new().fg(t.cyan).bold())
             } else {
                 Span::raw(" ".repeat(key_w))
             };
@@ -98,14 +99,15 @@ fn details_lines(t: &Theme, details: &Details, width: usize) -> Vec<Line<'static
 }
 
 fn warning_lines(t: &Theme, ws: &[Warning], width: usize) -> Vec<Line<'static>> {
-    const KEY_W: usize = 12;
+    // Fits "⚠ Warning" plus two spaces.
+    const KEY_W: usize = 11;
     let val_w = width.saturating_sub(KEY_W).max(1);
     let mut lines = Vec::new();
     for w in ws {
         let (key, color) = match w.severity {
-            Severity::Alarm => ("⚠ Alarma", t.red),
-            Severity::Warn => ("⚠ Atención", t.yellow),
-            Severity::Info => ("Nota", t.muted),
+            Severity::Alarm => ("⚠ Alert", t.red),
+            Severity::Warn => ("⚠ Warning", t.yellow),
+            Severity::Info => ("Note", t.muted),
         };
         for (i, part) in wrap(&w.text, val_w).into_iter().enumerate() {
             let head = if i == 0 {
@@ -123,7 +125,7 @@ fn draw_clean_details(frame: &mut Frame, area: Rect, st: &mut State) {
     let t = st.theme;
     let lines = match st.selected_clean() {
         Some(row) => clean_detail_lines(t, row, &st.orphans, area.width as usize),
-        None => vec![Line::from("Sin elemento seleccionado").style(Style::new().fg(t.muted))],
+        None => vec![Line::from("No item selected").style(Style::new().fg(t.muted))],
     };
     let max_scroll = lines.len().saturating_sub(area.height as usize) as u16;
     st.right_scroll = st.right_scroll.min(max_scroll);
@@ -147,17 +149,15 @@ fn clean_detail_lines(
         );
     }
     lines.push(Line::raw(""));
-    let size = task
-        .bytes
-        .map_or_else(|| "desconocido".to_string(), human_size);
-    lines.push(Line::from(format!("Candidatos: {}", task.count)));
-    lines.push(Line::from(format!("Tamaño: {size}")));
+    let size = task.bytes.map_or_else(|| "unknown".to_string(), human_size);
+    lines.push(Line::from(format!("Candidates: {}", task.count)));
+    lines.push(Line::from(format!("Size: {size}")));
     if let Some(command) = &row.command {
-        lines.extend(labeled_lines("Comando: ", command, width));
+        lines.extend(labeled_lines("Command: ", command, width));
     }
     if !task.items.is_empty() {
         lines.push(Line::raw(""));
-        lines.push(Line::from("Elementos:").bold());
+        lines.push(Line::from("Items:").bold());
         for item in &task.items {
             let text = match orphans.iter().find(|(name, _)| name == item) {
                 Some((_, bytes)) => format!("{item}  {}", human_size(*bytes)),
@@ -184,7 +184,7 @@ mod tests {
     fn row_of(rows: &[String], text: &str) -> usize {
         rows.iter()
             .position(|r| r.contains(text))
-            .unwrap_or_else(|| panic!("falta {text:?}"))
+            .unwrap_or_else(|| panic!("missing {text:?}"))
     }
 
     #[test]
@@ -195,18 +195,18 @@ mod tests {
             vec![test_warning(
                 Kind::MaintainerChanged,
                 Severity::Alarm,
-                "cambió",
+                "maintainer changed",
             )],
         );
-        st.details = vec![("Nombre".to_string(), "firefox".to_string())];
+        st.details = vec![("Name".to_string(), "firefox".to_string())];
         let rows = render_at(&mut st, WIDE, TALL);
-        assert!(row_of(&rows, "⚠ Alarma") < row_of(&rows, "Nombre"));
+        assert!(row_of(&rows, "⚠ Alert") < row_of(&rows, "Name"));
     }
 
     #[test]
     fn details_scroll_is_clamped_to_the_content() {
         let mut st = two_packages_state();
-        st.details = vec![("Nombre".to_string(), "firefox".to_string())];
+        st.details = vec![("Name".to_string(), "firefox".to_string())];
         st.right_scroll = 500;
         render_at(&mut st, WIDE, TALL);
         assert_eq!(st.right_scroll, 0);
@@ -216,21 +216,30 @@ mod tests {
     fn multiline_values_keep_their_continuation_aligned() {
         let mut st = two_packages_state();
         st.details = vec![(
-            "Dependencias opcionales".to_string(),
-            "alfa: primero\nbeta: segundo".to_string(),
+            "Optional dependencies".to_string(),
+            "alpha: first\nbeta: second".to_string(),
         )];
         let rows = render_at(&mut st, WIDE, TALL);
-        let first = row_of(&rows, "alfa:");
+        let first = row_of(&rows, "alpha:");
         let second = row_of(&rows, "beta:");
         assert_eq!(second, first + 1);
-        assert_eq!(rows[first].find("alfa:"), rows[second].find("beta:"));
+        assert_eq!(rows[first].find("alpha:"), rows[second].find("beta:"));
+    }
+
+    #[test]
+    fn long_keys_keep_a_space_before_the_value_on_narrow_panels() {
+        let mut st = two_packages_state();
+        st.details = vec![("Optional dependencies".to_string(), "alpha".to_string())];
+        let rows = render_at(&mut st, 80, TALL);
+        let row = &rows[row_of(&rows, "alpha")];
+        assert!(row.contains("… alpha"), "{row}");
     }
 
     #[test]
     fn clean_details_list_the_items_with_their_sizes() {
         let mut st = clean_state();
         let rows = render_at(&mut st, WIDE, TALL);
-        assert!(rows.iter().any(|r| r.contains("Elementos:")));
+        assert!(rows.iter().any(|r| r.contains("Items:")));
         assert!(rows.iter().any(|r| r.contains("go  226.6 MiB")));
     }
 
@@ -239,6 +248,6 @@ mod tests {
         let mut st = clean_state();
         st.right_tab = RightTab::Pkgbuild;
         let rows = render_at(&mut st, WIDE, TALL).join("\n");
-        assert!(rows.contains("No aplica en Limpieza"));
+        assert!(rows.contains("Not available in Cleanup"));
     }
 }

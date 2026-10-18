@@ -2,12 +2,12 @@
 pub enum Source {
     Repo(String),
     Aur,
-    /// Instalado y ausente de los repos sincronizados: viene del AUR o se instaló a mano.
+    /// Installed and missing from the synced repos: it comes from the AUR or was installed by hand.
     Foreign,
 }
 
 impl Source {
-    /// Nombre del repo, "aur" o "local".
+    /// Repo name, "aur" or "local".
     pub fn label(&self) -> &str {
         match self {
             Source::Repo(repo) => repo,
@@ -20,7 +20,7 @@ impl Source {
 #[derive(Debug, Clone)]
 pub struct Package {
     pub name: String,
-    /// Versión del repo o del AUR; en `Foreign`, la instalada.
+    /// Version from the repo or the AUR; for `Foreign`, the installed one.
     pub version: String,
     pub description: String,
     pub source: Source,

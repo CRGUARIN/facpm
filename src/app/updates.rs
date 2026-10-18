@@ -1,5 +1,5 @@
-//! Actualizaciones de repos y del AUR, el modal de `u`, noticias, advertencias y la línea base de
-//! mantenedores.
+//! Repo and AUR updates, the `U` modal, news, warnings and the maintainer
+//! baseline.
 
 use std::collections::{HashMap, HashSet};
 
@@ -15,8 +15,8 @@ use crate::pkg::{Package, Source};
 
 const AUR_INFO_BATCH: usize = 100;
 const UPGRADE_LIST_MAX: usize = 10;
-const NO_CHECKUPDATES: &str = "checkupdates no está instalado (pacman-contrib): se usa la base local, puede estar desactualizada";
-/// Ventana de "noticia nueva" cuando no hay log de pacman: 30 días.
+const NO_CHECKUPDATES: &str = "checkupdates isn't installed (pacman-contrib): using the local database, which may be out of date";
+/// Window for a "new news" post when there's no pacman log: 30 days.
 const NEWS_WINDOW: i64 = 30 * 24 * 60 * 60;
 
 impl App {
@@ -40,7 +40,7 @@ impl App {
             })
             .collect();
         let more = rows.len() - lines.len();
-        // La peor advertencia de cada paquete; la lista de warnings va ordenada.
+        // The worst warning of each package; the warnings list is sorted.
         let mut flagged: Vec<(String, Severity, String)> = rows
             .iter()
             .filter_map(|row| {
@@ -84,8 +84,8 @@ impl App {
         self.rebuild_updates();
     }
 
-    /// La parte del AUR de las actualizaciones. Con índice es síncrona; sin índice, `aur::info`
-    /// en un hilo.
+    /// The AUR part of the updates. With an index it's synchronous; without one, `aur::info`
+    /// in a thread.
     pub(super) fn recompute_aur_updates(&mut self) {
         let local = self.aur_index.as_ref().map(|index| {
             let foreign = foreign_packages(&self.state.installed);
@@ -94,7 +94,7 @@ impl App {
         });
         match local {
             Some(list) => {
-                // Descarta una comprobación por `aur::info` que siguiera en vuelo.
+                // Drop an `aur::info` check that was still in flight.
                 self.aur_check_gen += 1;
                 self.aur_check = Some(Ok(list));
                 self.rebuild_updates();
@@ -121,8 +121,8 @@ impl App {
         self.rebuild_updates();
     }
 
-    /// Resultado de `checkupdates`. Los `Update` de repos se arman aquí porque necesitan la base.
-    /// Ok(None): sin `checkupdates`, se usa la base local.
+    /// Result of `checkupdates`. The repo `Update`s are built here because they need the database.
+    /// Ok(None): no `checkupdates`, so the local database is used.
     pub(super) fn on_repo_updates(
         &mut self,
         generation: u64,
@@ -168,7 +168,7 @@ impl App {
             Err(e) => {
                 let msg = format!("{e:#}");
                 self.set_background_status(
-                    format!("AUR: no se pudieron comprobar las actualizaciones: {msg}"),
+                    format!("AUR: couldn't check for updates: {msg}"),
                     Level::Error,
                 );
                 Err(msg)
@@ -204,8 +204,8 @@ impl App {
         });
     }
 
-    /// Resultado de las noticias. `since` es la última actualización del log, o hace 30 días si
-    /// no hay log. Un error no pone status: el encabezado ya dice que no se pudieron descargar.
+    /// News result. `since` is the last upgrade in the log, or 30 days ago if
+    /// there's no log. An error sets no status: the header already says it couldn't be downloaded.
     pub(super) fn on_news(
         &mut self,
         generation: u64,
@@ -226,9 +226,9 @@ impl App {
         self.recompute_warnings();
     }
 
-    /// Recalcula las advertencias de cada paquete: señales de la actualización, del AUR (con el
-    /// índice), noticias nuevas que lo mencionan o que son avisos del AUR, y los foráneos
-    /// instalados sin actualización.
+    /// Recomputes each package's warnings: update signals, AUR signals (with the index),
+    /// new news that mention it or are AUR notices, and the installed foreign packages
+    /// without an update.
     pub(super) fn recompute_warnings(&mut self) {
         let now = Utc::now().timestamp();
         let new_news: Vec<NewsItem> = self.state.news.new_items().into_iter().cloned().collect();
@@ -303,8 +303,8 @@ impl App {
         self.state.warnings = map;
     }
 
-    /// Línea base de la primera carga del índice: cada foráneo del índice que no tiene entrada
-    /// se guarda con su mantenedor actual. Los que ya estaban no se tocan: ahí está la alarma.
+    /// Baseline on the first index load: each foreign package in the index without an entry
+    /// is saved with its current maintainer. Existing entries are left alone: that's where the alarm lives.
     pub(super) fn seed_maintainers(&mut self) {
         let Some(index) = &self.aur_index else {
             return;
@@ -329,8 +329,8 @@ impl App {
         }
     }
 
-    /// Tras un `u` que terminó bien: los foráneos del índice pasan a tener su mantenedor actual,
-    /// así que la alarma de cambio de mantenedor desaparece.
+    /// After a `U` that succeeded: the foreign packages in the index get their current maintainer,
+    /// so the maintainer-change alarm goes away.
     pub(super) fn snapshot_after_upgrade(&mut self) {
         let Some(index) = &self.aur_index else {
             return;
@@ -352,7 +352,7 @@ impl App {
     fn save_maintainers_snapshot(&mut self) {
         if let Err(e) = (self.maintainers_saver)(&self.maintainers) {
             self.set_background_status(
-                format!("No se pudo guardar el registro de mantenedores: {e:#}"),
+                format!("Couldn't save the maintainer records: {e:#}"),
                 Level::Warn,
             );
         }
@@ -411,16 +411,16 @@ mod tests {
 
     fn only_mantenedor(m: &Maintainers) -> anyhow::Result<()> {
         anyhow::ensure!(
-            m.get("zzfacpm-g") == Some(&Some("mantenedor".to_string())),
-            "línea base incompleta"
+            m.get("zzfacpm-g") == Some(&Some("maintainer".to_string())),
+            "incomplete baseline"
         );
         Ok(())
     }
 
-    fn only_nuevo(m: &Maintainers) -> anyhow::Result<()> {
+    fn only_new(m: &Maintainers) -> anyhow::Result<()> {
         anyhow::ensure!(
-            m.get("zzfacpm-f") == Some(&Some("nuevo".to_string())),
-            "línea base incompleta"
+            m.get("zzfacpm-f") == Some(&Some("new".to_string())),
+            "incomplete baseline"
         );
         Ok(())
     }
@@ -487,7 +487,7 @@ mod tests {
             vec![raw("zzfacpm-a", "1.0-1", "1.1-1")],
             vec![aur_update("zzfacpm-b", "1.0-1", "1.0-2")],
         );
-        press(&mut app, KeyCode::Char('u'));
+        press(&mut app, KeyCode::Char('U'));
         match &app.state.modal {
             Some(Modal::Upgrade(plan)) => {
                 assert_eq!((plan.repos, plan.aur), (1, 1));
@@ -498,7 +498,7 @@ mod tests {
         }
         match press(&mut app, KeyCode::Char('y')) {
             Some(Action::Run(cmd)) => assert_eq!(command_line(&cmd), "yay -Syu"),
-            None => panic!("confirmar debe devolver la acción"),
+            None => panic!("confirming must return the action"),
         }
         assert!(app.state.modal.is_none());
         assert!(app.pending_upgrade);
@@ -509,7 +509,7 @@ mod tests {
         let mut app = app_with(Helper::Pacman);
         let agen = app.aur_check_gen;
         app.on_aur_updates(agen, Ok(vec![aur_update("zzfacpm-b", "1.0-1", "1.0-2")]));
-        press(&mut app, KeyCode::Char('u'));
+        press(&mut app, KeyCode::Char('U'));
         match &app.state.modal {
             Some(Modal::Upgrade(plan)) => {
                 assert!(plan.pacman_warning);
@@ -536,7 +536,7 @@ mod tests {
             )]),
             Some(SINCE),
         );
-        press(&mut app, KeyCode::Char('u'));
+        press(&mut app, KeyCode::Char('U'));
         match &app.state.modal {
             Some(Modal::Upgrade(plan)) => {
                 assert_eq!(plan.news_new, 1);
@@ -558,7 +558,7 @@ mod tests {
             ]),
             Some(SINCE),
         );
-        press(&mut app, KeyCode::Char('u'));
+        press(&mut app, KeyCode::Char('U'));
         match &app.state.modal {
             Some(Modal::Upgrade(plan)) => {
                 assert_eq!(plan.news_new, 2);
@@ -572,12 +572,12 @@ mod tests {
     fn on_news_keeps_the_newest_first_and_the_log_date() {
         let mut app = empty_app();
         let generation = app.news_gen;
-        let items = vec![news_item("Vieja", BEFORE), news_item("Nueva", AFTER)];
+        let items = vec![news_item("Old", BEFORE), news_item("New", AFTER)];
         app.on_news(generation, Ok(items), Some(SINCE));
         match &app.state.news {
             NewsState::Loaded { items, since } => {
                 assert_eq!(*since, SINCE);
-                assert_eq!(items[0].title, "Nueva");
+                assert_eq!(items[0].title, "New");
             }
             other => panic!("{other:?}"),
         }
@@ -588,7 +588,7 @@ mod tests {
         let mut app = empty_app();
         let before = Utc::now().timestamp();
         let generation = app.news_gen;
-        app.on_news(generation, Ok(vec![news_item("Vieja", BEFORE)]), None);
+        app.on_news(generation, Ok(vec![news_item("Old", BEFORE)]), None);
         match &app.state.news {
             NewsState::Loaded { since, .. } => {
                 assert!(*since >= before - NEWS_WINDOW);
@@ -628,11 +628,11 @@ mod tests {
             .set_installed(vec![foreign_pkg("zzfacpm-f", "1.0-1")]);
         app.refresh_details();
         app.maintainers
-            .insert("zzfacpm-f".to_string(), Some("viejo".to_string()));
+            .insert("zzfacpm-f".to_string(), Some("old".to_string()));
         app.on_aur_index(AurIndex::from_pkgs(vec![aur_pkg_maintained(
             "zzfacpm-f",
             "1.0-1",
-            Some("nuevo"),
+            Some("new"),
         )]));
         let ws = app.state.warnings.get("zzfacpm-f").expect("advertencias");
         assert!(
@@ -641,8 +641,8 @@ mod tests {
         );
         assert_eq!(
             app.maintainers.get("zzfacpm-f"),
-            Some(&Some("viejo".to_string())),
-            "el cambio no se pisa"
+            Some(&Some("old".to_string())),
+            "the change isn't overwritten"
         );
     }
 
@@ -656,16 +656,16 @@ mod tests {
         app.on_aur_index(AurIndex::from_pkgs(vec![aur_pkg_maintained(
             "zzfacpm-g",
             "1.0-1",
-            Some("mantenedor"),
+            Some("maintainer"),
         )]));
         assert_eq!(
             app.maintainers.get("zzfacpm-g"),
-            Some(&Some("mantenedor".to_string()))
+            Some(&Some("maintainer".to_string()))
         );
         assert_eq!(
             level(&app),
             Some(Level::Ok),
-            "el guardado recibió la línea base completa"
+            "the save received the full baseline"
         );
         assert!(!kinds_of(&app, "zzfacpm-g").contains(&Kind::MaintainerChanged));
     }
@@ -680,9 +680,9 @@ mod tests {
         app.on_aur_index(AurIndex::from_pkgs(vec![aur_pkg_maintained(
             "zzfacpm-g",
             "1.0-1",
-            Some("mantenedor"),
+            Some("maintainer"),
         )]));
-        assert!(status_text(&app).contains("No se pudo guardar el registro de mantenedores"));
+        assert!(status_text(&app).contains("Couldn't save the maintainer records"));
         assert_eq!(level(&app), Some(Level::Warn));
     }
 
@@ -693,25 +693,25 @@ mod tests {
             .set_installed(vec![foreign_pkg("zzfacpm-f", "1.0-1")]);
         app.refresh_details();
         app.maintainers
-            .insert("zzfacpm-f".to_string(), Some("viejo".to_string()));
+            .insert("zzfacpm-f".to_string(), Some("old".to_string()));
         app.on_aur_index(AurIndex::from_pkgs(vec![aur_pkg_maintained(
             "zzfacpm-f",
             "1.0-1",
-            Some("nuevo"),
+            Some("new"),
         )]));
         assert!(kinds_of(&app, "zzfacpm-f").contains(&Kind::MaintainerChanged));
 
-        app.maintainers_saver = only_nuevo;
+        app.maintainers_saver = only_new;
         app.snapshot_after_upgrade();
         assert!(!kinds_of(&app, "zzfacpm-f").contains(&Kind::MaintainerChanged));
         assert_eq!(
             app.maintainers.get("zzfacpm-f"),
-            Some(&Some("nuevo".to_string()))
+            Some(&Some("new".to_string()))
         );
         assert_eq!(
             level(&app),
             Some(Level::Ok),
-            "el guardado recibió la línea base nueva"
+            "the save received the new baseline"
         );
     }
 
@@ -724,7 +724,7 @@ mod tests {
         ]);
         app.refresh_details();
         app.on_aur_index(AurIndex::from_pkgs(vec![
-            aur_pkg("zzfacpm-otro", &[]),
+            aur_pkg("zzfacpm-other", &[]),
             aur_pkg("zzfacpm-n", &[]),
         ]));
         assert!(kinds_of(&app, "zzfacpm-m").contains(&Kind::Missing));

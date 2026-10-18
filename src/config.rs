@@ -9,12 +9,12 @@ use crate::theme;
 
 const FILE_NAME: &str = "config.toml";
 
-/// Ruta que no se puede escribir: sin HOME ni XDG_CONFIG_HOME absolutos no hay dónde guardar.
+/// A path that can't be written: without an absolute HOME or XDG_CONFIG_HOME there is nowhere to save.
 const NOWHERE: &str = "/nonexistent/facpm/config.toml";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
-    /// `id` de un tema de `theme::THEMES`.
+    /// `id` of a theme in `theme::THEMES`.
     pub theme: String,
 }
 
@@ -27,7 +27,7 @@ impl Default for Config {
 }
 
 impl Config {
-    /// `$XDG_CONFIG_HOME/facpm/config.toml` o `~/.config/facpm/config.toml`.
+    /// `$XDG_CONFIG_HOME/facpm/config.toml` or `~/.config/facpm/config.toml`.
     pub fn path() -> PathBuf {
         path_from(
             std::env::var_os("XDG_CONFIG_HOME"),
@@ -35,7 +35,7 @@ impl Config {
         )
     }
 
-    /// Si el archivo falta o no se entiende, usa el valor por defecto. No devuelve error.
+    /// If the file is missing or can't be parsed, uses the default value. It never returns an error.
     pub fn load() -> Config {
         load_from(&Config::path())
     }
@@ -43,7 +43,7 @@ impl Config {
     pub fn save(&self) -> Result<()> {
         let path = Config::path();
         if path == Path::new(NOWHERE) {
-            bail!("no hay HOME ni XDG_CONFIG_HOME absolutos: no se puede guardar la configuración");
+            bail!("there's no absolute HOME or XDG_CONFIG_HOME: can't save the configuration");
         }
         self.save_to(&path)
     }
@@ -51,15 +51,15 @@ impl Config {
     fn save_to(&self, path: &Path) -> Result<()> {
         let dir = path
             .parent()
-            .context("la ruta de la configuración no tiene carpeta")?;
-        fs::create_dir_all(dir).with_context(|| format!("no se pudo crear {}", dir.display()))?;
-        // Temporal en la misma carpeta y rename: un corte a mitad no deja el archivo a medias.
+            .context("the configuration path has no folder")?;
+        fs::create_dir_all(dir).with_context(|| format!("couldn't create {}", dir.display()))?;
+        // Temp file in the same folder, then rename: a cut in the middle never leaves a half-written file.
         let tmp = tmp_path(path);
         let written = write_then_rename(&tmp, path, &render(self));
         if written.is_err() {
             let _ = fs::remove_file(&tmp);
         }
-        written.with_context(|| format!("no se pudo guardar {}", path.display()))
+        written.with_context(|| format!("couldn't save {}", path.display()))
     }
 }
 
@@ -81,7 +81,7 @@ fn load_from(path: &Path) -> Config {
         .unwrap_or_default()
 }
 
-/// Un tema desconocido cae en "terminal". Las líneas raras y las claves ajenas se ignoran.
+/// An unknown theme falls back to "terminal". Odd lines and foreign keys are ignored.
 fn parse(text: &str) -> Config {
     let mut config = Config::default();
     for line in text.lines() {
@@ -176,32 +176,32 @@ mod tests {
     #[test]
     fn path_prefers_absolute_xdg_then_home() {
         assert_eq!(
-            path_from(os("/x/cfg"), os("/home/ejemplo")),
+            path_from(os("/x/cfg"), os("/home/someone")),
             PathBuf::from("/x/cfg/facpm/config.toml")
         );
         assert_eq!(
-            path_from(None, os("/home/ejemplo")),
-            PathBuf::from("/home/ejemplo/.config/facpm/config.toml")
+            path_from(None, os("/home/someone")),
+            PathBuf::from("/home/someone/.config/facpm/config.toml")
         );
         assert_eq!(
-            path_from(os(""), os("/home/ejemplo")),
-            PathBuf::from("/home/ejemplo/.config/facpm/config.toml")
+            path_from(os(""), os("/home/someone")),
+            PathBuf::from("/home/someone/.config/facpm/config.toml")
         );
         assert_eq!(
-            path_from(os("relativo"), os("/home/ejemplo")),
-            PathBuf::from("/home/ejemplo/.config/facpm/config.toml")
+            path_from(os("relative"), os("/home/someone")),
+            PathBuf::from("/home/someone/.config/facpm/config.toml")
         );
     }
 
     #[test]
     fn path_without_absolute_dirs_is_nowhere() {
         assert_eq!(path_from(None, None), PathBuf::from(NOWHERE));
-        assert_eq!(path_from(os(""), os("relativo")), PathBuf::from(NOWHERE));
+        assert_eq!(path_from(os(""), os("relative")), PathBuf::from(NOWHERE));
     }
 
     #[test]
     fn parse_accepts_spaces_and_comments() {
-        let text = "  # comentario\n\n   theme   =   \"nord\"   # otro comentario\n";
+        let text = "  # comment\n\n   theme   =   \"nord\"   # another comment\n";
         assert_eq!(parse(text), config("nord"));
         assert_eq!(parse("theme=\"dracula\""), config("dracula"));
         assert_eq!(parse(""), Config::default());
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn parse_skips_other_keys_and_malformed_lines() {
-        let text = "idioma = \"es\"\nlinea rota\ntheme = nord\ntheme = \"nord\" extra\n";
+        let text = "language = \"es\"\nbroken line\ntheme = nord\ntheme = \"nord\" extra\n";
         assert_eq!(parse(text), Config::default());
         assert_eq!(
             parse("color = \"red\"\ntheme = \"gruvbox\"\n"),

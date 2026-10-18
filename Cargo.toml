@@ -2,7 +2,7 @@
 name = "facpm"
 version = "0.1.0"
 edition = "2024"
-description = "Gestor de paquetes para Arch Linux con interfaz de terminal"
+description = "A fancy TUI package manager for Arch Linux and the AUR"
 license = "MIT"
 repository = "https://github.com/CRGUARIN/facpm"
 readme = "README.md"
