@@ -1,0 +1,25 @@
+[package]
+name = "facpm"
+version = "0.1.0"
+edition = "2024"
+description = "Gestor de paquetes para Arch Linux con interfaz de terminal"
+license = "MIT"
+repository = "https://github.com/CRGUARIN/facpm"
+readme = "README.md"
+keywords = ["arch", "pacman", "aur", "tui"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+ratatui = "0.30"
+alpm = "5"
+ureq = { version = "2", features = ["json"] }
+flate2 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+chrono = "0.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
