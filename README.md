@@ -10,6 +10,7 @@ upgrade with your eyes open and reclaim gigabytes of cache, all from one keyboar
 [![Arch Linux](https://img.shields.io/badge/Arch_Linux-1793D1?style=for-the-badge&logo=archlinux&logoColor=white)](https://archlinux.org)
 [![Rust](https://img.shields.io/badge/Rust-B7410E?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/github/license/CRGUARIN/facpm?style=for-the-badge&color=957FB8)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/CRGUARIN/facpm/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/CRGUARIN/facpm/actions/workflows/ci.yml)
 
 [Why](#why-facpm) · [Install](#install) · [Keys](#keys) · [Themes](#themes) · [Configuration](#configuration)
 
